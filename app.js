@@ -1,1975 +1,3341 @@
-const S = {
-  role: 'owner',
-  view: 'dashboard',
-  lang: 'ar',
-  sensitiveGranted: ['owner'],
+const state = {
+  role: "owner",
+  lang: "ar",
+  page: "home",
+  selectedInspector: null,
   answers: {
-    a: 'ok',
-    b: 'fail',
-    c: 'na',
-    d: 'ok'
+    a: "ok",
+    b: "fail",
+    c: "na",
+    d: "ok"
   },
-  status: 'draft',
-  reviewState: 'pending',
-  selectedInspector: '',
-  findingType: 'immediate',
-  findingSeverity: 'critical',
-  escalationBasis: 'calendar',
-  escalationStart: 'finding_created',
-  attachmentPolicy: 'compressed',
-  signatureDone: false
+  sensitiveAccess: ["owner"],
+  escalationBasis: "calendar",
+  escalationStart: "created"
 };
 
-const t = (ar, en) => S.lang === 'ar' ? ar : en;
-
-const I = name => `<i data-lucide="${name}"></i>`;
-
-const B = (text, type = 'neutral') => {
-  return `<span class="badge ${type}">${text}</span>`;
-};
-
-const ROLE_META = {
+const roles = {
   owner: {
-    ar: 'سلطان — مالك النظام',
-    en: 'Sultan — System Owner',
-    sar: 'كل المشاريع + إدارة صلاحية البلاغات الحساسة',
-    sen: 'All projects + sensitive access control'
+    ar: "مالك النظام",
+    en: "System Owner",
+    nameAr: "سلطان",
+    nameEn: "Sultan",
+    email: "owner@demo.local",
+    icon: "crown"
   },
 
   quality_admin: {
-    ar: 'إدارة قسم الجودة',
-    en: 'Quality Management',
-    sar: 'كل المشاريع التشغيلية',
-    sen: 'All operational projects'
+    ar: "إدارة قسم الجودة",
+    en: "Quality Management",
+    nameAr: "نورة",
+    nameEn: "Noura",
+    email: "quality@demo.local",
+    icon: "badge-check"
   },
 
   quality_staff: {
-    ar: 'موظف قسم الجودة',
-    en: 'Quality Officer',
-    sar: 'المراجعة والمتابعة ضمن الصلاحيات',
-    sen: 'Review and follow-up within permissions'
+    ar: "موظف قسم الجودة",
+    en: "Quality Officer",
+    nameAr: "سارة",
+    nameEn: "Sarah",
+    email: "officer@demo.local",
+    icon: "clipboard-check"
   },
 
   project_manager: {
-    ar: 'مدير مشروع — أحمد',
-    en: 'Project Manager — Ahmed',
-    sar: 'مشروع الواحة فقط',
-    sen: 'Al Waha project only'
+    ar: "مدير المشروع",
+    en: "Project Manager",
+    nameAr: "أحمد",
+    nameEn: "Ahmed",
+    email: "manager@demo.local",
+    icon: "briefcase-business"
   },
 
   inspector: {
-    ar: 'مفتش الجودة — خالد',
-    en: 'Quality Inspector — Khaled',
-    sar: 'زياراته ونماذجه فقط',
-    sen: 'Assigned visits and forms only'
+    ar: "مفتش الجودة",
+    en: "Quality Inspector",
+    nameAr: "خالد",
+    nameEn: "Khaled",
+    email: "inspector@demo.local",
+    icon: "scan-search"
   },
 
   guard_supervisor: {
-    ar: 'مشرف حراس الأمن — فهد',
-    en: 'Guard Supervisor — Fahad',
-    sar: 'الحراس وطلبات التدريب ضمن النطاق',
-    sen: 'Guards and training requests in scope'
+    ar: "مشرف حراس الأمن",
+    en: "Guard Supervisor",
+    nameAr: "فهد",
+    nameEn: "Fahad",
+    email: "supervisor@demo.local",
+    icon: "users-round"
   },
 
   guard: {
-    ar: 'حارس الأمن — محمد',
-    en: 'Security Guard — Mohammed',
-    sar: 'الخدمات الشخصية والبلاغات الخاصة',
-    sen: 'Personal services and own reports'
+    ar: "حارس الأمن",
+    en: "Security Guard",
+    nameAr: "محمد",
+    nameEn: "Mohammed",
+    email: "guard@demo.local",
+    icon: "shield"
   }
 };
 
-const NAV = [
-  [
-    'dashboard',
-    'layout-dashboard',
-    'لوحة التحكم',
-    'Dashboard',
-    'owner,quality_admin,quality_staff,project_manager,inspector,guard_supervisor'
-  ],
-
-  [
-    'projects',
-    'building-2',
-    'المشاريع',
-    'Projects',
-    'owner,quality_admin,quality_staff,project_manager'
-  ],
-
-  [
-    'schedule',
-    'calendar-days',
-    'جدول التفتيش',
-    'Inspection Schedule',
-    'owner,quality_admin,project_manager,inspector'
-  ],
-
-  [
-    'inspection',
-    'clipboard-check',
-    'التفتيش الميداني',
-    'Field Inspection',
-    'owner,quality_admin,quality_staff,project_manager,inspector'
-  ],
-
-  [
-    'review',
-    'stamp',
-    'المراجعة والاعتماد',
-    'Review & Approval',
-    'owner,quality_admin,quality_staff'
-  ],
-
-  [
-    'forms',
-    'blocks',
-    'النماذج والإصدارات',
-    'Forms & Versions',
-    'owner,quality_admin'
-  ],
-
-  [
-    'guards',
-    'users-round',
-    'الحراس والتقييم',
-    'Guards & Evaluation',
-    'owner,quality_admin,quality_staff,project_manager,inspector,guard_supervisor'
-  ],
-
-  [
-    'actions',
-    'circle-check-big',
-    'الإجراءات والتصعيد',
-    'Actions & Escalation',
-    'owner,quality_admin,quality_staff,project_manager'
-  ],
-
-  [
-    'training',
-    'graduation-cap',
-    'طلبات التدريب',
-    'Training Requests',
-    'owner,quality_admin,project_manager,guard_supervisor'
-  ],
-
-  [
-    'confidential',
-    'lock-keyhole',
-    'البلاغات الحساسة',
-    'Sensitive Reports',
-    'owner,quality_admin,quality_staff,project_manager,inspector,guard_supervisor,guard'
-  ],
-
-  [
-    'reports',
-    'file-chart-column',
-    'التقارير',
-    'Reports',
-    'owner,quality_admin,quality_staff,project_manager,inspector'
-  ],
-
-  [
-    'analytics',
-    'chart-no-axes-combined',
-    'التحليلات',
-    'Analytics',
-    'owner,quality_admin,project_manager'
-  ],
-
-  [
-    'score_model',
-    'calculator',
-    'معادلة التقييم',
-    'Scoring Model',
-    'owner,quality_admin'
-  ],
-
-  [
-    'registration',
-    'file-signature',
-    'التسجيل والتعهد',
-    'Registration & Undertaking',
-    'owner,quality_admin'
-  ],
-
-  [
-    'users',
-    'user-cog',
-    'الحسابات والصلاحيات',
-    'Accounts & Permissions',
-    'owner,quality_admin'
-  ],
-
-  [
-    'permission_test',
-    'shield-check',
-    'اختبار الصلاحيات',
-    'Permission Tests',
-    'owner,quality_admin'
-  ],
-
-  [
-    'attachment_settings',
-    'paperclip',
-    'سياسة المرفقات',
-    'Attachment Policy',
-    'owner,quality_admin'
-  ],
-
-  [
-    'audit',
-    'scroll-text',
-    'سجل العمليات',
-    'Audit Log',
-    'owner,quality_admin'
-  ],
-
-  [
-    'backup',
-    'database-backup',
-    'النسخ والاستعادة',
-    'Backup & Restore',
-    'owner'
-  ],
-
-  [
-    'delivery_plan',
-    'clipboard-list',
-    'خطة التنفيذ والتسليم',
-    'Delivery Plan',
-    'owner,quality_admin'
-  ],
-
-  [
-    'demo_guide',
-    'map',
-    'دليل الديمو',
-    'Demo Guide',
-    'owner,quality_admin,quality_staff,project_manager,inspector,guard_supervisor,guard'
-  ]
-];
-
 const projects = [
   {
-    id: 'P-001',
-    ar: 'مشروع الواحة السكني',
-    en: 'Al Waha Residential',
-    code: 'WH-01',
-    regionAr: 'الرياض — شمال',
-    regionEn: 'Riyadh — North',
-    score: 92,
-    visits: 18,
-    open: 3,
+    id: "P-001",
+    code: "WH-01",
+    ar: "مشروع الواحة السكني",
+    en: "Al Waha Residential",
+    regionAr: "الرياض — شمال",
+    regionEn: "Riyadh — North",
     employees: 120,
+    score: 92,
     findings: 14,
-    avgClose: 3.2,
-    improvement: 8.4,
+    openActions: 3,
     complaints: 2,
+    closeDays: 3.2,
+    improvement: 8.4,
     contractDays: 42
   },
 
   {
-    id: 'P-002',
-    ar: 'مشروع بوابة النخيل',
-    en: 'Palm Gate Project',
-    code: 'PG-07',
-    regionAr: 'الرياض — شرق',
-    regionEn: 'Riyadh — East',
-    score: 81,
-    visits: 14,
-    open: 6,
+    id: "P-002",
+    code: "PG-07",
+    ar: "مشروع بوابة النخيل",
+    en: "Palm Gate Project",
+    regionAr: "الرياض — شرق",
+    regionEn: "Riyadh — East",
     employees: 75,
+    score: 81,
     findings: 19,
-    avgClose: 5.8,
-    improvement: 2.1,
+    openActions: 6,
     complaints: 5,
+    closeDays: 5.8,
+    improvement: 2.1,
     contractDays: 17
   }
 ];
 
 const inspectors = [
   {
-    id: 'INS-01',
-    ar: 'خالد السالم',
-    en: 'Khaled Al Salem',
-    employee: 'EMP-2201',
+    id: "INS-01",
+    ar: "خالد السالم",
+    en: "Khaled Al Salem",
+    emp: "EMP-2201",
     visits: {
-      '2026-10-08': ['10:00'],
-      '2026-10-09': ['09:00']
+      "2026-10-08": ["10:00"]
     }
   },
 
   {
-    id: 'INS-02',
-    ar: 'ريم القحطاني',
-    en: 'Reem Al Qahtani',
-    employee: 'EMP-2207',
+    id: "INS-02",
+    ar: "ريم القحطاني",
+    en: "Reem Al Qahtani",
+    emp: "EMP-2207",
     visits: {
-      '2026-10-08': ['13:00'],
-      '2026-10-10': ['10:00']
+      "2026-10-08": ["13:00"]
     }
   },
 
   {
-    id: 'INS-03',
-    ar: 'سارة الحربي',
-    en: 'Sarah Al Harbi',
-    employee: 'EMP-2212',
+    id: "INS-03",
+    ar: "سارة الحربي",
+    en: "Sarah Al Harbi",
+    emp: "EMP-2212",
     visits: {
-      '2026-10-08': ['10:00', '15:00']
+      "2026-10-08": [
+        "10:00",
+        "15:00"
+      ]
     }
   },
 
   {
-    id: 'INS-04',
-    ar: 'ماجد الدوسري',
-    en: 'Majed Al Dosari',
-    employee: 'EMP-2219',
+    id: "INS-04",
+    ar: "ماجد الدوسري",
+    en: "Majed Al Dosari",
+    emp: "EMP-2219",
     visits: {}
   }
 ];
 
-const scorePolicy = {
-  severity: {
-    low: 2,
-    medium: 5,
-    high: 10,
-    critical: 20
-  },
+const navConfig = {
+  owner: [
+    ["home", "house", "الرئيسية", "Home"],
+    ["projects", "building-2", "المشاريع", "Projects"],
+    ["permissions", "shield-check", "الصلاحيات", "Permissions"],
+    ["sensitive", "lock-keyhole", "البلاغات الحساسة", "Sensitive Reports"],
+    ["operations", "settings-2", "التشغيل والتسليم", "Operations"]
+  ],
 
-  typeMultiplier: {
-    immediate: 1.5,
-    timed: 1,
-    long_term: 0.5
-  }
+  quality_admin: [
+    ["home", "house", "الرئيسية", "Home"],
+    ["projects", "building-2", "المشاريع", "Projects"],
+    ["schedule", "calendar-days", "الجدولة", "Scheduling"],
+    ["review", "stamp", "المراجعات", "Reviews"],
+    ["analytics", "chart-no-axes-combined", "التقارير والتحليلات", "Reports & Analytics"],
+    ["forms", "blocks", "النماذج", "Forms"]
+  ],
+
+  quality_staff: [
+    ["home", "house", "الرئيسية", "Home"],
+    ["review", "stamp", "المراجعات", "Reviews"],
+    ["actions", "circle-check-big", "الإجراءات", "Actions"],
+    ["reports", "file-chart-column", "التقارير", "Reports"]
+  ],
+
+  project_manager: [
+    ["home", "house", "الرئيسية", "Home"],
+    ["project", "building-2", "مشروعي", "My Project"],
+    ["actions", "circle-check-big", "الملاحظات والإجراءات", "Findings & Actions"],
+    ["training", "graduation-cap", "طلبات التدريب", "Training"],
+    ["reports", "file-chart-column", "التقارير", "Reports"]
+  ],
+
+  inspector: [
+    ["home", "house", "الرئيسية", "Home"],
+    ["my_visits", "calendar-check", "زياراتي", "My Visits"],
+    ["inspection", "clipboard-check", "بدء التفتيش", "Start Inspection"],
+    ["returned", "undo-2", "المعاد للاستكمال", "Returned"],
+    ["my_reports", "file-text", "تقاريري", "My Reports"]
+  ],
+
+  guard_supervisor: [
+    ["home", "house", "الرئيسية", "Home"],
+    ["guards", "users-round", "الحراس", "Guards"],
+    ["training", "graduation-cap", "طلبات التدريب", "Training Requests"]
+  ],
+
+  guard: [
+    ["home", "house", "الرئيسية", "Home"],
+    ["my_services", "user-round", "خدماتي", "My Services"],
+    ["sensitive", "lock-keyhole", "بلاغ خاص", "Private Report"]
+  ]
 };
 
-function icons() {
-  if (window.lucide) {
-    lucide.createIcons();
-  }
+function t(ar, en) {
+  return state.lang === "ar"
+    ? ar
+    : en;
 }
 
-function toast(message) {
-  const element = document.querySelector('#toast');
+function icon(name) {
+  return `<i data-lucide="${name}"></i>`;
+}
 
-  if (!element) {
-    return;
-  }
-
-  element.textContent = message;
-  element.classList.add('show');
-
-  clearTimeout(window.__toastTimer);
-
-  window.__toastTimer = setTimeout(() => {
-    element.classList.remove('show');
-  }, 2500);
+function badge(text, type = "neutral") {
+  return `
+    <span class="badge ${type}">
+      ${text}
+    </span>
+  `;
 }
 
 function projectName(id) {
-  const project = projects.find(item => item.id === id);
+  const project = projects.find(
+    item => item.id === id
+  );
 
   if (!project) {
     return id;
   }
 
-  return S.lang === 'ar'
+  return state.lang === "ar"
     ? project.ar
     : project.en;
 }
 
-function hasSensitive() {
-  return (
-    S.role === 'owner' ||
-    S.role === 'guard' ||
-    S.sensitiveGranted.includes(S.role)
+function refreshIcons() {
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
+
+function animatePage() {
+  if (!window.gsap) {
+    return;
+  }
+
+  gsap.from(
+    ".pageIntro",
+    {
+      opacity: 0,
+      y: 18,
+      duration: .45,
+      ease: "power3.out"
+    }
+  );
+
+  gsap.from(
+    ".heroPanel, .section, .card",
+    {
+      opacity: 0,
+      y: 20,
+      duration: .55,
+      stagger: .055,
+      ease: "power3.out"
+    }
   );
 }
 
-function allowed(view) {
-  const item = NAV.find(nav => nav[0] === view);
+function toast(message) {
+  const el =
+    document.querySelector(
+      "#toast"
+    );
 
-  if (!item) {
-    return true;
-  }
+  el.textContent = message;
 
-  if (!item[4].split(',').includes(S.role)) {
-    return false;
-  }
+  el.classList.add("show");
 
-  if (view === 'confidential' && !hasSensitive()) {
-    return false;
-  }
+  clearTimeout(
+    window.toastTimer
+  );
 
-  return true;
+  window.toastTimer =
+    setTimeout(
+      () => {
+        el.classList.remove(
+          "show"
+        );
+      },
+      2500
+    );
 }
 
-function currentTitle() {
-  const item = NAV.find(nav => nav[0] === S.view);
+function modal(html) {
+  document.querySelector(
+    "#modalBody"
+  ).innerHTML = html;
 
-  return item
-    ? t(item[2], item[3])
-    : t('لوحة التحكم', 'Dashboard');
+  document.querySelector(
+    "#modalLayer"
+  ).classList.remove(
+    "hidden"
+  );
+
+  document.body.classList.add(
+    "modalOpen"
+  );
+
+  refreshIcons();
+
+  if (window.gsap) {
+    gsap.from(
+      ".modal",
+      {
+        opacity: 0,
+        y: 22,
+        scale: .98,
+        duration: .25
+      }
+    );
+  }
 }
 
-function setupNav() {
-  const nav = document.querySelector('#nav');
+function closeModal() {
+  document.querySelector(
+    "#modalLayer"
+  ).classList.add(
+    "hidden"
+  );
 
-  if (!nav) {
-    return;
-  }
+  document.body.classList.remove(
+    "modalOpen"
+  );
+}
 
-  nav.innerHTML = NAV
-    .filter(item => item[4].split(',').includes(S.role))
-    .filter(item => {
-      return item[0] !== 'confidential' || hasSensitive();
-    })
-    .map(item => {
-      return `
-        <button
-          class="navBtn ${S.view === item[0] ? 'active' : ''}"
-          data-v="${item[0]}"
-        >
-          ${I(item[1])}
+function listItem(
+  iconName,
+  title,
+  subtitle,
+  end = ""
+) {
+  return `
+    <div class="listItem">
+
+      <div class="listIcon">
+        ${icon(iconName)}
+      </div>
+
+      <div class="listText">
+
+        <b>
+          ${title}
+        </b>
+
+        <span>
+          ${subtitle}
+        </span>
+
+      </div>
+
+      <div class="listAction">
+        ${end}
+      </div>
+
+    </div>
+  `;
+}
+
+function taskCard(
+  iconName,
+  title,
+  description,
+  value,
+  valueLabel,
+  action,
+  tone = ""
+) {
+  return `
+    <article
+      class="taskCard"
+      onclick="${action}"
+    >
+
+      <div class="taskIcon ${tone}">
+        ${icon(iconName)}
+      </div>
+
+      <h3>
+        ${title}
+      </h3>
+
+      <p>
+        ${description}
+      </p>
+
+      <div class="taskBottom">
+
+        <div>
+          <strong>
+            ${value}
+          </strong>
 
           <span>
-            ${t(item[2], item[3])}
+            ${valueLabel}
           </span>
+        </div>
 
-          ${
-            item[0] === 'confidential'
-              ? `<span class="tag">${t('خاص', 'Private')}</span>`
-              : ''
-          }
-        </button>
-      `;
-    })
-    .join('');
+        ${icon("arrow-up-left")}
 
-  nav.querySelectorAll('.navBtn').forEach(button => {
-    button.onclick = () => {
-      go(button.dataset.v);
-    };
-  });
+      </div>
 
-  icons();
+    </article>
+  `;
 }
 
-function setupRoles() {
-  const menu = document.querySelector('#roleMenu');
+function statBox(
+  value,
+  label,
+  trend = ""
+) {
+  return `
+    <div class="statBox">
+      <strong>
+        ${value}
+      </strong>
 
-  if (!menu) {
+      <span>
+        ${label}
+      </span>
+
+      ${
+        trend
+          ? `
+            <small>
+              ${trend}
+            </small>
+          `
+          : ""
+      }
+    </div>
+  `;
+}
+
+function pageIntro(
+  eyebrow,
+  title,
+  description,
+  actions = ""
+) {
+  return `
+    <div class="pageIntro">
+
+      <div class="pageIntroText">
+
+        <span class="eyebrow">
+          ${icon("sparkles")}
+          ${eyebrow}
+        </span>
+
+        <h1>
+          ${title}
+        </h1>
+
+        <p>
+          ${description}
+        </p>
+
+      </div>
+
+      ${
+        actions
+          ? `
+            <div class="quickActions">
+              ${actions}
+            </div>
+          `
+          : ""
+      }
+
+    </div>
+  `;
+}
+
+function workflow(
+  active = 1
+) {
+  const steps = [
+    [
+      "01",
+      t(
+        "المشروع",
+        "Project"
+      ),
+      t(
+        "النطاق والموقع",
+        "Scope & site"
+      ),
+      "projects"
+    ],
+
+    [
+      "02",
+      t(
+        "الزيارة",
+        "Visit"
+      ),
+      t(
+        "الجدولة والتنفيذ",
+        "Schedule & execute"
+      ),
+      "my_visits"
+    ],
+
+    [
+      "03",
+      t(
+        "التقرير",
+        "Report"
+      ),
+      t(
+        "المراجعة والقرار",
+        "Review & decision"
+      ),
+      "reports"
+    ],
+
+    [
+      "04",
+      t(
+        "الملاحظة",
+        "Finding"
+      ),
+      t(
+        "التصنيف والخطورة",
+        "Class & severity"
+      ),
+      "actions"
+    ],
+
+    [
+      "05",
+      t(
+        "المعالجة",
+        "Action"
+      ),
+      t(
+        "الإغلاق والتصعيد",
+        "Closure & escalation"
+      ),
+      "actions"
+    ]
+  ];
+
+  return `
+    <div class="workflow">
+
+      ${steps
+        .map(
+          (
+            item,
+            index
+          ) => {
+            return `
+              <div
+                class="
+                  workflowItem
+                  ${
+                    index + 1 ===
+                    active
+                      ? "active"
+                      : ""
+                  }
+                "
+              >
+
+                <span>
+                  ${item[0]}
+                </span>
+
+                <b>
+                  ${item[1]}
+                </b>
+
+                <small>
+                  ${item[2]}
+                </small>
+
+              </div>
+            `;
+          }
+        )
+        .join("")}
+
+    </div>
+  `;
+}
+
+function routeStrip(
+  current
+) {
+  const items = [
+    [
+      "building-2",
+      t(
+        "مشروع الواحة",
+        "Al Waha Project"
+      )
+    ],
+
+    [
+      "calendar-check",
+      "VIS-2026-000123"
+    ],
+
+    [
+      "file-text",
+      "REP-2026-000094"
+    ],
+
+    [
+      "triangle-alert",
+      "FND-2026-0041"
+    ],
+
+    [
+      "circle-check-big",
+      "CAPA-2026-0041"
+    ]
+  ];
+
+  return `
+    <div class="routeStrip">
+
+      ${items
+        .map(
+          (
+            item,
+            index
+          ) => {
+            return `
+              <div
+                class="
+                  routeNode
+                  ${
+                    current === index
+                      ? "active"
+                      : ""
+                  }
+                "
+              >
+                ${icon(item[0])}
+                ${item[1]}
+              </div>
+
+              ${
+                index <
+                items.length - 1
+                  ? `
+                    <span class="routeArrow">
+                      ${icon(
+                        state.lang ===
+                          "ar"
+                          ? "chevron-left"
+                          : "chevron-right"
+                      )}
+                    </span>
+                  `
+                  : ""
+              }
+            `;
+          }
+        )
+        .join("")}
+
+    </div>
+  `;
+}
+
+function setupNavigation() {
+  const nav =
+    navConfig[state.role];
+
+  const html =
+    nav
+      .map(item => {
+        return `
+          <button
+            class="
+              navLink
+              ${
+                state.page ===
+                item[0]
+                  ? "active"
+                  : ""
+              }
+            "
+            onclick="go('${item[0]}')"
+          >
+            ${icon(item[1])}
+
+            ${t(
+              item[2],
+              item[3]
+            )}
+          </button>
+        `;
+      })
+      .join("");
+
+  document.querySelector(
+    "#mainNav"
+  ).innerHTML = html;
+
+  document.querySelector(
+    "#mobileNav"
+  ).innerHTML = html;
+
+  refreshIcons();
+}
+
+function setupAccountMenu() {
+  const menu =
+    document.querySelector(
+      "#accountMenu"
+    );
+
+  menu.innerHTML =
+    Object.entries(roles)
+      .map(
+        ([key, role]) => {
+          return `
+            <button
+              class="roleOption"
+              onclick="switchRole('${key}')"
+            >
+
+              <div class="roleOptionIcon">
+                ${icon(role.icon)}
+              </div>
+
+              <div>
+                <b>
+                  ${t(
+                    role.ar,
+                    role.en
+                  )}
+                </b>
+
+                <span>
+                  ${t(
+                    role.nameAr,
+                    role.nameEn
+                  )}
+                </span>
+              </div>
+
+            </button>
+          `;
+        }
+      )
+      .join("");
+
+  refreshIcons();
+}
+
+function updateAccount() {
+  const role =
+    roles[state.role];
+
+  document.querySelector(
+    "#accountName"
+  ).textContent =
+    t(
+      role.nameAr,
+      role.nameEn
+    );
+
+  document.querySelector(
+    "#accountRole"
+  ).textContent =
+    t(
+      role.ar,
+      role.en
+    );
+
+  document.querySelector(
+    "#accountAvatar"
+  ).textContent =
+    (
+      state.lang === "ar"
+        ? role.nameAr
+        : role.nameEn
+    ).charAt(0);
+
+  document.querySelector(
+    "#workspaceName"
+  ).textContent =
+    t(
+      role.ar,
+      role.en
+    );
+}
+
+function switchRole(role) {
+  state.role = role;
+  state.page = "home";
+
+  document.querySelector(
+    "#accountMenu"
+  ).classList.remove(
+    "open"
+  );
+
+  updateAccount();
+  setupAccountMenu();
+  setupNavigation();
+  render();
+
+  toast(
+    t(
+      "تم تبديل الحساب التجريبي",
+      "Demo account changed"
+    )
+  );
+}
+
+function go(page) {
+  state.page = page;
+
+  document.querySelector(
+    "#mobileNav"
+  ).classList.remove(
+    "open"
+  );
+
+  render();
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+}
+
+function ownerHome() {
+  return `
+    ${pageIntro(
+      t(
+        "SYSTEM OWNER",
+        "SYSTEM OWNER"
+      ),
+      t(
+        "مساء الخير سلطان",
+        "Good evening Sultan"
+      ),
+      t(
+        "بدل الدخول في تفاصيل التشغيل اليومية تبدأ من صورة النظام العامة والصلاحيات والبلاغات الحساسة وحالة التشغيل",
+        "Start from system-wide control permissions sensitive access and operational status instead of daily field work"
+      )
+    )}
+
+    <section class="heroPanel">
+
+      <div class="heroPanelInner">
+
+        <div class="heroCopy">
+
+          <span class="eyebrow">
+            ${icon("shield-check")}
+            ${t(
+              "نظرة المالك",
+              "Owner overview"
+            )}
+          </span>
+
+          <h2>
+            ${t(
+              "النظام تحت السيطرة وكل دور يرى فقط ما يحتاجه",
+              "One system with clearly separated responsibilities"
+            )}
+          </h2>
+
+          <p>
+            ${t(
+              "الوصول إلى البلاغات الحساسة منفصل عن أي مسمى وظيفي وتستطيع منح أو سحب التصريح بنفسك بينما تظل باقي العمليات التشغيلية تحت إدارة الجودة",
+              "Sensitive access is independent from job titles and only the System Owner can grant or revoke it while Quality Management handles operations"
+            )}
+          </p>
+
+          <div class="heroActionRow">
+
+            <button
+              class="button primary"
+              onclick="go('permissions')"
+            >
+              ${icon("shield-check")}
+              ${t(
+                "إدارة الصلاحيات",
+                "Manage permissions"
+              )}
+            </button>
+
+            <button
+              class="button"
+              onclick="go('sensitive')"
+            >
+              ${icon("lock-keyhole")}
+              ${t(
+                "البلاغات الحساسة",
+                "Sensitive reports"
+              )}
+            </button>
+
+          </div>
+
+        </div>
+
+        <div class="focusCard">
+
+          <div class="focusHead">
+
+            <span>
+              ${t(
+                "الحالة التشغيلية",
+                "Operational status"
+              )}
+            </span>
+
+            <span class="statusDot"></span>
+
+          </div>
+
+          <div class="focusMain">
+
+            <strong>
+              99.9%
+            </strong>
+
+            <span>
+              ${t(
+                "جاهزية النظام",
+                "System availability"
+              )}
+            </span>
+
+          </div>
+
+          <div class="focusMeta">
+
+            <div>
+              <b>2</b>
+              <span>
+                ${t(
+                  "مشاريع نشطة",
+                  "Active projects"
+                )}
+              </span>
+            </div>
+
+            <div>
+              <b>04:10</b>
+              <span>
+                ${t(
+                  "آخر نسخة احتياطية",
+                  "Last backup"
+                )}
+              </span>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="sectionHead">
+
+        <div>
+          <h2>
+            ${t(
+              "أهم ما يحتاج انتباهك",
+              "What needs your attention"
+            )}
+          </h2>
+
+          <p>
+            ${t(
+              "صفحة المالك لا تكرر تفاصيل إدارة الجودة",
+              "Owner home avoids duplicating Quality Management work"
+            )}
+          </p>
+        </div>
+
+      </div>
+
+      <div class="taskGrid">
+
+        ${taskCard(
+          "lock-keyhole",
+          t(
+            "البلاغات الحساسة",
+            "Sensitive Reports"
+          ),
+          t(
+            "قناة مستقلة لا يصل إليها أي دور تلقائيًا",
+            "Independent channel with no automatic role access"
+          ),
+          "3",
+          t(
+            "بلاغات مفتوحة",
+            "open reports"
+          ),
+          "go('sensitive')",
+          "red"
+        )}
+
+        ${taskCard(
+          "user-cog",
+          t(
+            "تغييرات الصلاحيات",
+            "Permission Changes"
+          ),
+          t(
+            "مراجعة آخر تغييرات الأدوار والنطاقات",
+            "Review recent role and scope changes"
+          ),
+          "5",
+          t(
+            "هذا الأسبوع",
+            "this week"
+          ),
+          "go('permissions')",
+          "gold"
+        )}
+
+        ${taskCard(
+          "database-backup",
+          t(
+            "النسخ والاستعادة",
+            "Backup & Restore"
+          ),
+          t(
+            "حالة النسخ وسياسة الاحتفاظ وتجربة الاستعادة",
+            "Backup health retention policy and restore testing"
+          ),
+          "100%",
+          t(
+            "آخر نسخة ناجحة",
+            "last run successful"
+          ),
+          "go('operations')",
+          "blue"
+        )}
+
+        ${taskCard(
+          "building-2",
+          t(
+            "المشاريع",
+            "Projects"
+          ),
+          t(
+            "الوصول للصورة العليا للمشاريع دون الدخول في تشغيل المفتش",
+            "Executive project view without inspector workflow"
+          ),
+          "2",
+          t(
+            "مشاريع",
+            "projects"
+          ),
+          "go('projects')"
+        )}
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="sectionHead">
+        <div>
+          <h2>
+            ${t(
+              "رحلة الحالة داخل النظام",
+              "System case journey"
+            )}
+          </h2>
+
+          <p>
+            ${t(
+              "أي حالة يمكن تتبعها من أصلها حتى إغلاقها",
+              "Any case can be traced from origin through closure"
+            )}
+          </p>
+        </div>
+      </div>
+
+      ${workflow(1)}
+
+    </section>
+  `;
+}
+
+function qualityAdminHome() {
+  return `
+    ${pageIntro(
+      "QUALITY MANAGEMENT",
+      t(
+        "مركز عمل إدارة الجودة",
+        "Quality Management Workspace"
+      ),
+      t(
+        "ابدأ من المهام التشغيلية المطلوبة اليوم بدل البحث بين شاشات النظام",
+        "Start directly from today's operational tasks instead of searching through system screens"
+      ),
+      `
+        <button
+          class="button primary"
+          onclick="go('schedule')"
+        >
+          ${icon("calendar-plus")}
+          ${t(
+            "جدولة زيارة",
+            "Schedule visit"
+          )}
+        </button>
+
+        <button
+          class="button"
+          onclick="go('review')"
+        >
+          ${icon("stamp")}
+          ${t(
+            "التقارير بانتظار المراجعة",
+            "Pending reviews"
+          )}
+        </button>
+      `
+    )}
+
+    <section class="heroPanel">
+
+      <div class="heroPanelInner">
+
+        <div class="heroCopy">
+
+          <span class="eyebrow">
+            ${icon("badge-check")}
+            ${t(
+              "اليوم في الجودة",
+              "Today in Quality"
+            )}
+          </span>
+
+          <h2>
+            ${t(
+              "3 زيارات تحتاج إسناد و6 تقارير تنتظر المراجعة",
+              "3 visits need assignment and 6 reports await review"
+            )}
+          </h2>
+
+          <p>
+            ${t(
+              "التركيز هنا على ما يجب تنفيذه الآن من جدولة ومراجعة واعتماد وتصعيد بدل عرض كل وظائف النظام في قائمة واحدة",
+              "This workspace focuses on scheduling review approvals and escalations rather than exposing every system function at once"
+            )}
+          </p>
+
+          <div class="heroActionRow">
+
+            <button
+              class="button primary"
+              onclick="go('schedule')"
+            >
+              ${icon("users")}
+              ${t(
+                "اختيار مفتش متاح",
+                "Assign available inspector"
+              )}
+            </button>
+
+            <button
+              class="button"
+              onclick="go('review')"
+            >
+              ${icon("file-check-2")}
+              ${t(
+                "مراجعة أحدث تقرير",
+                "Review latest report"
+              )}
+            </button>
+
+          </div>
+
+        </div>
+
+        <div class="focusCard">
+
+          <div class="focusHead">
+
+            <span>
+              ${t(
+                "أعلى أولوية",
+                "Highest priority"
+              )}
+            </span>
+
+            ${badge(
+              t(
+                "حرج",
+                "Critical"
+              ),
+              "danger"
+            )}
+
+          </div>
+
+          <div class="focusMain">
+
+            <strong>
+              CAPA-0041
+            </strong>
+
+            <span>
+              ${t(
+                "بوابة طوارئ · مشروع الواحة",
+                "Emergency Gate · Al Waha"
+              )}
+            </span>
+
+          </div>
+
+          <div class="focusMeta">
+
+            <div>
+              <b>9</b>
+              <span>
+                ${t(
+                  "أيام مفتوحة",
+                  "days open"
+                )}
+              </span>
+            </div>
+
+            <div>
+              <b>
+                ${t(
+                  "أحمر",
+                  "Red"
+                )}
+              </b>
+              <span>
+                ${t(
+                  "مرحلة التصعيد",
+                  "escalation"
+                )}
+              </span>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="sectionHead">
+        <div>
+          <h2>
+            ${t(
+              "مهامك الرئيسية",
+              "Your main tasks"
+            )}
+          </h2>
+
+          <p>
+            ${t(
+              "كل بطاقة تفتح المهمة مباشرة",
+              "Each card opens the task directly"
+            )}
+          </p>
+        </div>
+      </div>
+
+      <div class="taskGrid">
+
+        ${taskCard(
+          "calendar-days",
+          t(
+            "الجدولة",
+            "Scheduling"
+          ),
+          t(
+            "اختر التاريخ وشاهد جميع المفتشين المتاحين والمجدولين مسبقًا",
+            "Select date and instantly see available and busy inspectors"
+          ),
+          "3",
+          t(
+            "زيارات للإسناد",
+            "visits to assign"
+          ),
+          "go('schedule')",
+          "blue"
+        )}
+
+        ${taskCard(
+          "stamp",
+          t(
+            "المراجعات",
+            "Reviews"
+          ),
+          t(
+            "تقارير تم إرسالها من المفتشين وتحتاج قرارًا",
+            "Submitted inspector reports awaiting a decision"
+          ),
+          "6",
+          t(
+            "بانتظار المراجعة",
+            "pending reviews"
+          ),
+          "go('review')",
+          "gold"
+        )}
+
+        ${taskCard(
+          "circle-alert",
+          t(
+            "الإجراءات المتصاعدة",
+            "Escalated Actions"
+          ),
+          t(
+            "حالات وصلت للأصفر أو البرتقالي أو الأحمر",
+            "Cases that reached yellow orange or red escalation"
+          ),
+          "4",
+          t(
+            "تحتاج متابعة",
+            "need follow-up"
+          ),
+          "go('analytics')",
+          "red"
+        )}
+
+        ${taskCard(
+          "chart-no-axes-combined",
+          t(
+            "التقارير والتحليلات",
+            "Reports & Analytics"
+          ),
+          t(
+            "المقارنات والاتجاهات والملاحظات والشكاوى والعقود",
+            "Trends findings complaints project comparison and contracts"
+          ),
+          "88%",
+          t(
+            "متوسط عام",
+            "overall score"
+          ),
+          "go('analytics')"
+        )}
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="sectionHead">
+        <div>
+          <h2>
+            ${t(
+              "تسلسل العمل",
+              "Operational journey"
+            )}
+          </h2>
+        </div>
+      </div>
+
+      ${workflow(2)}
+
+    </section>
+  `;
+}
+
+function qualityStaffHome() {
+  return `
+    ${pageIntro(
+      "QUALITY OFFICER",
+      t(
+        "صباح الخير سارة",
+        "Good morning Sarah"
+      ),
+      t(
+        "أمامك فقط التقارير والحالات التي تحتاج مراجعتك أو متابعتك",
+        "You only see reports and cases requiring your review or follow-up"
+      )
+    )}
+
+    <section class="heroPanel">
+
+      <div class="heroPanelInner">
+
+        <div class="heroCopy">
+
+          <span class="eyebrow">
+            ${icon("clipboard-check")}
+            ${t(
+              "قائمة العمل",
+              "Work queue"
+            )}
+          </span>
+
+          <h2>
+            ${t(
+              "ابدئي من التقارير الجديدة ثم تابعي الحالات المعادة",
+              "Start with new reports then follow returned cases"
+            )}
+          </h2>
+
+          <p>
+            ${t(
+              "لا تظهر لك وظائف الجدولة أو إدارة النماذج إلا إذا تم إضافتها صراحةً إلى قالب دورك",
+              "Scheduling and form management stay hidden unless explicitly enabled in your role template"
+            )}
+          </p>
+
+        </div>
+
+        <div class="focusCard">
+
+          <div class="focusHead">
+            <span>
+              ${t(
+                "بانتظارك",
+                "Waiting for you"
+              )}
+            </span>
+
+            ${badge(
+              "6",
+              "warning"
+            )}
+          </div>
+
+          <div class="focusMain">
+            <strong>
+              REP-000094
+            </strong>
+
+            <span>
+              ${t(
+                "آخر تقرير وصل للمراجعة",
+                "Latest report awaiting review"
+              )}
+            </span>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="taskGrid">
+
+        ${taskCard(
+          "stamp",
+          t(
+            "تقارير للمراجعة",
+            "Reports to review"
+          ),
+          t(
+            "افتح التقرير وراجع البنود والأدلة ثم أعده أو صعّده للاعتماد",
+            "Review items and evidence then return or move forward"
+          ),
+          "6",
+          t(
+            "تقارير",
+            "reports"
+          ),
+          "go('review')",
+          "gold"
+        )}
+
+        ${taskCard(
+          "rotate-ccw",
+          t(
+            "معاد للمفتش",
+            "Returned to inspector"
+          ),
+          t(
+            "حالات تم إعادتها لاستكمال دليل أو ملاحظة",
+            "Cases returned for missing evidence or information"
+          ),
+          "2",
+          t(
+            "حالتان",
+            "cases"
+          ),
+          "go('review')",
+          "blue"
+        )}
+
+        ${taskCard(
+          "circle-check-big",
+          t(
+            "الإجراءات",
+            "Actions"
+          ),
+          t(
+            "متابعة أدلة المعالجة قبل الإغلاق",
+            "Review treatment evidence before closure"
+          ),
+          "5",
+          t(
+            "بانتظار الجودة",
+            "pending quality"
+          ),
+          "go('actions')"
+        )}
+
+        ${taskCard(
+          "file-chart-column",
+          t(
+            "التقارير",
+            "Reports"
+          ),
+          t(
+            "الوصول للتقارير التشغيلية ضمن نطاقك فقط",
+            "Operational reports within your assigned scope"
+          ),
+          "24",
+          t(
+            "هذا الشهر",
+            "this month"
+          ),
+          "go('reports')"
+        )}
+
+      </div>
+
+    </section>
+  `;
+}
+
+function inspectorHome() {
+  return `
+    ${pageIntro(
+      "FIELD INSPECTOR",
+      t(
+        "مرحبًا خالد",
+        "Welcome Khaled"
+      ),
+      t(
+        "صفحتك تبدأ من زياراتك مباشرة ولا تعرض لك تحليلات المشاريع أو نتائجها العامة",
+        "Your workspace begins with assigned visits and does not expose project analytics or general project scores"
+      )
+    )}
+
+    <section class="heroPanel">
+
+      <div class="heroPanelInner">
+
+        <div class="heroCopy">
+
+          <span class="eyebrow">
+            ${icon("map-pin-check")}
+            ${t(
+              "زيارتك القادمة",
+              "Your next visit"
+            )}
+          </span>
+
+          <h2>
+            ${t(
+              "مشروع الواحة السكني",
+              "Al Waha Residential"
+            )}
+          </h2>
+
+          <p>
+            ${t(
+              "اليوم الساعة 10:30 · البوابة الرئيسية · تفتيش دوري · وردية صباحية",
+              "Today 10:30 · Main Gate · Routine Inspection · Morning Shift"
+            )}
+          </p>
+
+          <div class="heroActionRow">
+
+            <button
+              class="button primary"
+              onclick="go('inspection')"
+            >
+              ${icon("play")}
+              ${t(
+                "بدء التفتيش",
+                "Start inspection"
+              )}
+            </button>
+
+            <button
+              class="button"
+              onclick="go('my_visits')"
+            >
+              ${icon("calendar-days")}
+              ${t(
+                "عرض كل زياراتي",
+                "View my visits"
+              )}
+            </button>
+
+          </div>
+
+        </div>
+
+        <div class="focusCard">
+
+          <div class="focusHead">
+
+            <span>
+              VIS-2026-000123
+            </span>
+
+            ${badge(
+              t(
+                "مجدولة",
+                "Scheduled"
+              ),
+              "info"
+            )}
+
+          </div>
+
+          <div class="focusMain">
+
+            <strong>
+              10:30
+            </strong>
+
+            <span>
+              ${t(
+                "اليوم",
+                "Today"
+              )}
+            </span>
+
+          </div>
+
+          <div class="focusMeta">
+
+            <div>
+              <b>v2.4</b>
+              <span>
+                ${t(
+                  "إصدار النموذج",
+                  "form version"
+                )}
+              </span>
+            </div>
+
+            <div>
+              <b>42</b>
+              <span>
+                ${t(
+                  "بند تفتيش",
+                  "inspection items"
+                )}
+              </span>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="sectionHead">
+
+        <div>
+          <h2>
+            ${t(
+              "ما الذي تحتاج تنفيذه",
+              "What you need to do"
+            )}
+          </h2>
+
+          <p>
+            ${t(
+              "لا توجد قوائم إدارية غير مرتبطة بعمل المفتش",
+              "No unrelated administrative modules"
+            )}
+          </p>
+        </div>
+
+      </div>
+
+      <div class="taskGrid">
+
+        ${taskCard(
+          "calendar-check",
+          t(
+            "زيارات اليوم",
+            "Today's Visits"
+          ),
+          t(
+            "الزيارات التي تم إسنادها لك فقط",
+            "Only visits assigned to your account"
+          ),
+          "3",
+          t(
+            "زيارات",
+            "visits"
+          ),
+          "go('my_visits')",
+          "blue"
+        )}
+
+        ${taskCard(
+          "save",
+          t(
+            "المسودات",
+            "Drafts"
+          ),
+          t(
+            "تفتيش بدأت به ولم يتم إرساله بعد",
+            "Inspections started but not submitted"
+          ),
+          "1",
+          t(
+            "مسودة",
+            "draft"
+          ),
+          "go('inspection')"
+        )}
+
+        ${taskCard(
+          "undo-2",
+          t(
+            "معاد للاستكمال",
+            "Returned"
+          ),
+          t(
+            "تقارير أعادتها الجودة لاستكمال المطلوب",
+            "Reports returned by Quality for completion"
+          ),
+          "2",
+          t(
+            "تحتاج إجراء",
+            "need action"
+          ),
+          "go('returned')",
+          "gold"
+        )}
+
+        ${taskCard(
+          "file-text",
+          t(
+            "تقاريري",
+            "My Reports"
+          ),
+          t(
+            "تقارير زياراتك فقط والتنزيل حسب الصلاحية",
+            "Only your reports with permission-based download"
+          ),
+          "14",
+          t(
+            "تقارير",
+            "reports"
+          ),
+          "go('my_reports')"
+        )}
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="permissionNotice">
+
+        ${icon("eye-off")}
+
+        <span>
+          ${t(
+            "نتيجة المشروع والتحليلات العامة والمقارنة بين المشاريع غير متاحة للمفتش وتظل الحسابات داخل النظام محسوبة داخليًا دون عرضها لهذا الدور",
+            "Project scores general analytics and cross-project comparisons are not available to inspectors even though calculations remain stored internally"
+          )}
+        </span>
+
+      </div>
+
+    </section>
+  `;
+}
+
+function projectManagerHome() {
+  const p =
+    projects[0];
+
+  return `
+    ${pageIntro(
+      "PROJECT MANAGER",
+      t(
+        "مشروع الواحة أمامك الآن",
+        "Al Waha is your current workspace"
+      ),
+      t(
+        "بدل عرض جميع أجزاء النظام تبدأ من حالة مشروعك وما يحتاج قرارًا أو معالجة اليوم",
+        "Start from your project status and the items requiring action today"
+      )
+    )}
+
+    <section class="heroPanel">
+
+      <div class="heroPanelInner">
+
+        <div class="heroCopy">
+
+          <span class="eyebrow">
+            ${icon("building-2")}
+            ${p.code}
+          </span>
+
+          <h2>
+            ${projectName(
+              p.id
+            )}
+          </h2>
+
+          <p>
+            ${t(
+              "ترى بيانات هذا المشروع فقط بما يشمل التقارير والملاحظات والإجراءات والتدريب والتحليلات الخاصة به",
+              "You only see this project's reports findings actions training and analytics"
+            )}
+          </p>
+
+          <div class="heroActionRow">
+
+            <button
+              class="button primary"
+              onclick="go('actions')"
+            >
+              ${icon("circle-alert")}
+              ${t(
+                "الملاحظات المطلوب معالجتها",
+                "Findings requiring action"
+              )}
+            </button>
+
+            <button
+              class="button"
+              onclick="go('reports')"
+            >
+              ${icon("file-chart-column")}
+              ${t(
+                "تقارير المشروع",
+                "Project reports"
+              )}
+            </button>
+
+          </div>
+
+        </div>
+
+        <div class="focusCard">
+
+          <div class="focusHead">
+
+            <span>
+              ${t(
+                "تقييم المشروع",
+                "Project score"
+              )}
+            </span>
+
+            ${badge(
+              t(
+                "مستقر",
+                "Stable"
+              ),
+              "success"
+            )}
+
+          </div>
+
+          <div class="focusMain">
+
+            <strong>
+              ${p.score}/100
+            </strong>
+
+            <span>
+              ${t(
+                "وفق المعادلة المعتمدة لاحقًا",
+                "under the final approved formula"
+              )}
+            </span>
+
+          </div>
+
+          <div class="focusMeta">
+
+            <div>
+              <b>
+                ${p.openActions}
+              </b>
+
+              <span>
+                ${t(
+                  "إجراءات مفتوحة",
+                  "open actions"
+                )}
+              </span>
+            </div>
+
+            <div>
+              <b>
+                +${p.improvement}%
+              </b>
+
+              <span>
+                ${t(
+                  "اتجاه التحسن",
+                  "improvement"
+                )}
+              </span>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="taskGrid">
+
+        ${taskCard(
+          "triangle-alert",
+          t(
+            "الملاحظات المفتوحة",
+            "Open Findings"
+          ),
+          t(
+            "ما يحتاج معالجة من فريق مشروعك",
+            "Items your project team needs to resolve"
+          ),
+          "7",
+          t(
+            "ملاحظات",
+            "findings"
+          ),
+          "go('actions')",
+          "red"
+        )}
+
+        ${taskCard(
+          "clock-alert",
+          t(
+            "إجراءات متأخرة",
+            "Overdue Actions"
+          ),
+          t(
+            "حالات تجاوزت المدة المحددة",
+            "Cases beyond their target date"
+          ),
+          "3",
+          t(
+            "متأخرة",
+            "overdue"
+          ),
+          "go('actions')",
+          "gold"
+        )}
+
+        ${taskCard(
+          "graduation-cap",
+          t(
+            "طلبات التدريب",
+            "Training Requests"
+          ),
+          t(
+            "طلبات تحتاج موافقتك قبل الانتقال للجودة",
+            "Requests requiring your approval before Quality"
+          ),
+          "2",
+          t(
+            "بانتظار القرار",
+            "awaiting decision"
+          ),
+          "go('training')",
+          "blue"
+        )}
+
+        ${taskCard(
+          "file-check-2",
+          t(
+            "التقارير المعتمدة",
+            "Approved Reports"
+          ),
+          t(
+            "التقارير الرسمية الخاصة بمشروعك",
+            "Official approved reports for your project"
+          ),
+          "11",
+          t(
+            "هذا الشهر",
+            "this month"
+          ),
+          "go('reports')"
+        )}
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      ${workflow(4)}
+
+    </section>
+  `;
+}
+
+function supervisorHome() {
+  return `
+    ${pageIntro(
+      "GUARD SUPERVISOR",
+      t(
+        "إدارة الحراس والتدريب",
+        "Guards & Training"
+      ),
+      t(
+        "صفحتك مخصصة لتقييم الحراس والملاحظات وطلبات التدريب فقط",
+        "Your workspace focuses on guard evaluations findings and training requests"
+      )
+    )}
+
+    <section class="heroPanel">
+
+      <div class="heroPanelInner">
+
+        <div class="heroCopy">
+
+          <span class="eyebrow">
+            ${icon("users-round")}
+            ${t(
+              "فريق مشروع الواحة",
+              "Al Waha Guard Team"
+            )}
+          </span>
+
+          <h2>
+            ${t(
+              "لديك تقييمان يحتاجان إكمال اليوم",
+              "Two guard evaluations need completion today"
+            )}
+          </h2>
+
+          <p>
+            ${t(
+              "يمكنك فتح سجل كل حارس وتسجيل التقييم والملاحظات ورفع طلب تدريب عند الحاجة",
+              "Open each guard record add evaluation notes and create training requests when needed"
+            )}
+          </p>
+
+          <div class="heroActionRow">
+
+            <button
+              class="button primary"
+              onclick="go('guards')"
+            >
+              ${icon("user-round-check")}
+              ${t(
+                "تقييم حارس",
+                "Evaluate guard"
+              )}
+            </button>
+
+            <button
+              class="button"
+              onclick="go('training')"
+            >
+              ${icon("graduation-cap")}
+              ${t(
+                "طلب دورة",
+                "Request training"
+              )}
+            </button>
+
+          </div>
+
+        </div>
+
+        <div class="focusCard">
+
+          <div class="focusHead">
+            <span>
+              ${t(
+                "الفريق",
+                "Team"
+              )}
+            </span>
+
+            ${badge(
+              t(
+                "نشط",
+                "Active"
+              ),
+              "success"
+            )}
+          </div>
+
+          <div class="focusMain">
+            <strong>28</strong>
+
+            <span>
+              ${t(
+                "حارسًا ضمن نطاقك",
+                "guards in your scope"
+              )}
+            </span>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="taskGrid">
+
+        ${taskCard(
+          "user-round-check",
+          t(
+            "التقييمات",
+            "Evaluations"
+          ),
+          t(
+            "تقييم منفصل لكل حارس مع الملاحظات",
+            "Separate evaluation and notes for every guard"
+          ),
+          "2",
+          t(
+            "تحتاج إكمال",
+            "need completion"
+          ),
+          "go('guards')",
+          "gold"
+        )}
+
+        ${taskCard(
+          "repeat-2",
+          t(
+            "ملاحظات متكررة",
+            "Repeated Findings"
+          ),
+          t(
+            "حراس لديهم نفس الملاحظة أكثر من مرة",
+            "Guards with repeated findings"
+          ),
+          "4",
+          t(
+            "حالات",
+            "cases"
+          ),
+          "go('guards')",
+          "red"
+        )}
+
+        ${taskCard(
+          "graduation-cap",
+          t(
+            "طلبات التدريب",
+            "Training Requests"
+          ),
+          t(
+            "متابعة الطلب من مدير المشروع ثم الجودة",
+            "Track request through Project Manager then Quality"
+          ),
+          "3",
+          t(
+            "طلبات",
+            "requests"
+          ),
+          "go('training')",
+          "blue"
+        )}
+
+      </div>
+
+    </section>
+  `;
+}
+
+function guardHome() {
+  return `
+    ${pageIntro(
+      "SECURITY GUARD",
+      t(
+        "خدماتك الشخصية",
+        "Your personal services"
+      ),
+      t(
+        "واجهة بسيطة لا تعرض أي وظائف إدارية أو بيانات تخص الآخرين",
+        "A simple personal workspace without administrative functions or other users' data"
+      )
+    )}
+
+    <section class="heroPanel">
+
+      <div class="heroPanelInner">
+
+        <div class="heroCopy">
+
+          <span class="eyebrow">
+            ${icon("shield")}
+            EMP-1042
+          </span>
+
+          <h2>
+            ${t(
+              "مرحبًا محمد",
+              "Welcome Mohammed"
+            )}
+          </h2>
+
+          <p>
+            ${t(
+              "يمكنك تقديم استبيان أو شكوى أو بلاغ حساس ومتابعة ما أرسلته أنت فقط",
+              "You can submit surveys complaints or sensitive reports and track only your own submissions"
+            )}
+          </p>
+
+          <div class="heroActionRow">
+
+            <button
+              class="button primary"
+              onclick="go('sensitive')"
+            >
+              ${icon("lock-keyhole")}
+              ${t(
+                "إرسال بلاغ خاص",
+                "Submit private report"
+              )}
+            </button>
+
+          </div>
+
+        </div>
+
+        <div class="focusCard">
+
+          <div class="focusHead">
+            <span>
+              ${t(
+                "آخر بلاغ",
+                "Latest report"
+              )}
+            </span>
+
+            ${badge(
+              t(
+                "قيد المتابعة",
+                "In progress"
+              ),
+              "info"
+            )}
+          </div>
+
+          <div class="focusMain">
+            <strong>
+              SEC-0012
+            </strong>
+
+            <span>
+              ${t(
+                "يوجد رد جديد",
+                "New reply available"
+              )}
+            </span>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="taskGrid">
+
+        ${taskCard(
+          "clipboard-list",
+          t(
+            "استبيان",
+            "Survey"
+          ),
+          t(
+            "إرسال استبيان شخصي",
+            "Submit a personal survey"
+          ),
+          "01",
+          t(
+            "خدمة",
+            "service"
+          ),
+          "go('my_services')"
+        )}
+
+        ${taskCard(
+          "message-square-warning",
+          t(
+            "شكوى",
+            "Complaint"
+          ),
+          t(
+            "إرسال شكوى ومتابعة حالتها",
+            "Submit and track a complaint"
+          ),
+          "01",
+          t(
+            "خدمة",
+            "service"
+          ),
+          "go('my_services')",
+          "gold"
+        )}
+
+        ${taskCard(
+          "lock-keyhole",
+          t(
+            "بلاغ حساس",
+            "Sensitive Report"
+          ),
+          t(
+            "قناة مستقلة ومحكومة بتصريح خاص",
+            "Independent private channel with explicit access"
+          ),
+          "01",
+          t(
+            "خدمة",
+            "service"
+          ),
+          "go('sensitive')",
+          "red"
+        )}
+
+      </div>
+
+    </section>
+  `;
+}
+
+function projectsPage() {
+  let data = projects;
+
+  if (
+    state.role ===
+    "project_manager"
+  ) {
+    data =
+      projects.filter(
+        p => p.id === "P-001"
+      );
+  }
+
+  return `
+    ${pageIntro(
+      "PROJECTS",
+      t(
+        "المشاريع",
+        "Projects"
+      ),
+      t(
+        "كل مشروع هو نقطة البداية الطبيعية للزيارات والتقارير والملاحظات والإجراءات المرتبطة به",
+        "Each project is the natural starting point for its visits reports findings and actions"
+      )
+    )}
+
+    <div class="grid2">
+
+      ${data
+        .map(project => {
+          return `
+            <div class="card">
+
+              <div class="cardHead">
+
+                <div>
+                  <span class="eyebrow">
+                    ${project.code}
+                  </span>
+
+                  <h3
+                    style="
+                      margin-top:7px
+                    "
+                  >
+                    ${
+                      state.lang ===
+                      "ar"
+                        ? project.ar
+                        : project.en
+                    }
+                  </h3>
+
+                  <p>
+                    ${
+                      state.lang ===
+                      "ar"
+                        ? project.regionAr
+                        : project.regionEn
+                    }
+                  </p>
+                </div>
+
+                ${badge(
+                  t(
+                    "نشط",
+                    "Active"
+                  ),
+                  "success"
+                )}
+
+              </div>
+
+              <div class="statRow">
+
+                ${statBox(
+                  project.score +
+                    "/100",
+                  t(
+                    "تقييم المشروع",
+                    "Project score"
+                  )
+                )}
+
+                ${statBox(
+                  project.findings,
+                  t(
+                    "الملاحظات",
+                    "Findings"
+                  )
+                )}
+
+                ${statBox(
+                  project.openActions,
+                  t(
+                    "إجراءات مفتوحة",
+                    "Open actions"
+                  )
+                )}
+
+                ${statBox(
+                  project.contractDays,
+                  t(
+                    "يوم للعقد",
+                    "contract days"
+                  )
+                )}
+
+              </div>
+
+              <div
+                class="heroActionRow"
+              >
+
+                <button
+                  class="button primary"
+                  onclick="openProject('${project.id}')"
+                >
+                  ${icon("arrow-up-left")}
+                  ${t(
+                    "فتح المشروع",
+                    "Open project"
+                  )}
+                </button>
+
+              </div>
+
+            </div>
+          `;
+        })
+        .join("")}
+
+    </div>
+  `;
+}
+
+function projectPage() {
+  const p =
+    projects[0];
+
+  return `
+    ${pageIntro(
+      p.code,
+      projectName(
+        p.id
+      ),
+      t(
+        "كل ما يتعلق بهذا المشروع موجود في رحلة واحدة بدل التنقل بين أقسام غير مترابطة",
+        "Everything related to this project follows one connected journey instead of disconnected modules"
+      )
+    )}
+
+    ${routeStrip(0)}
+
+    <div class="statRow">
+
+      ${statBox(
+        p.score + "/100",
+        t(
+          "التقييم",
+          "Score"
+        )
+      )}
+
+      ${statBox(
+        p.employees,
+        t(
+          "الموظفون",
+          "Employees"
+        )
+      )}
+
+      ${statBox(
+        p.findings,
+        t(
+          "الملاحظات",
+          "Findings"
+        )
+      )}
+
+      ${statBox(
+        p.openActions,
+        t(
+          "إجراءات مفتوحة",
+          "Open actions"
+        )
+      )}
+
+    </div>
+
+    <section class="section">
+
+      <div class="grid2">
+
+        <div class="card">
+
+          <div class="cardHead">
+            <div>
+              <h3>
+                ${t(
+                  "آخر الزيارات",
+                  "Recent visits"
+                )}
+              </h3>
+
+              <p>
+                ${t(
+                  "افتح الزيارة لتنتقل للتقرير والملاحظات المرتبطة بها",
+                  "Open a visit to continue into its report and findings"
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div class="list">
+
+            ${listItem(
+              "calendar-check",
+              "VIS-2026-000123",
+              t(
+                "04 أكتوبر · تفتيش دوري · البوابة الرئيسية",
+                "04 Oct · Routine · Main Gate"
+              ),
+              `
+                <button
+                  class="button"
+                  onclick="go('reports')"
+                >
+                  ${t(
+                    "فتح",
+                    "Open"
+                  )}
+                </button>
+              `
+            )}
+
+            ${listItem(
+              "calendar-check",
+              "VIS-2026-000118",
+              t(
+                "01 أكتوبر · زيارة متابعة",
+                "01 Oct · Follow-up"
+              ),
+              badge(
+                t(
+                  "منفذة",
+                  "Completed"
+                ),
+                "success"
+              )
+            )}
+
+          </div>
+
+        </div>
+
+        <div class="card">
+
+          <div class="cardHead">
+            <div>
+              <h3>
+                ${t(
+                  "الملاحظات المطلوبة",
+                  "Findings requiring action"
+                )}
+              </h3>
+            </div>
+
+            ${badge(
+              "3",
+              "danger"
+            )}
+
+          </div>
+
+          <div class="list">
+
+            ${listItem(
+              "siren",
+              t(
+                "بوابة الطوارئ",
+                "Emergency gate"
+              ),
+              t(
+                "حرجة · متأخرة · تصعيد أحمر",
+                "Critical · overdue · red escalation"
+              ),
+              `
+                <button
+                  class="button danger"
+                  onclick="go('actions')"
+                >
+                  ${t(
+                    "معالجة",
+                    "Resolve"
+                  )}
+                </button>
+              `
+            )}
+
+            ${listItem(
+              "clock-3",
+              t(
+                "سجل الزوار",
+                "Visitor log"
+              ),
+              t(
+                "متوسطة · تصعيد أصفر",
+                "Medium · yellow escalation"
+              ),
+              badge(
+                t(
+                  "مفتوحة",
+                  "Open"
+                ),
+                "warning"
+              )
+            )}
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+  `;
+}
+
+function schedulePage() {
+  return `
+    ${pageIntro(
+      "INSPECTION SCHEDULING",
+      t(
+        "جدولة الزيارات بدون تعارض",
+        "Conflict-free Visit Scheduling"
+      ),
+      t(
+        "الجدولة من إدارة الجودة فقط وعند اختيار اليوم والوقت تظهر حالة جميع مفتشي الجودة مباشرة",
+        "Scheduling is controlled by Quality Management and date/time selection immediately shows every inspector's availability"
+      )
+    )}
+
+    <div class="card">
+
+      <div class="cardHead">
+
+        <div>
+          <h3>
+            ${t(
+              "زيارة جديدة",
+              "New Visit"
+            )}
+          </h3>
+
+          <p>
+            ${t(
+              "ابدأ بالموعد ثم اختر المفتش المتاح",
+              "Choose date and time then select an available inspector"
+            )}
+          </p>
+        </div>
+
+        ${badge(
+          t(
+            "إدارة الجودة فقط",
+            "Quality Management only"
+          ),
+          "info"
+        )}
+
+      </div>
+
+      <div class="availabilityHeader">
+
+        <div class="field">
+          <label>
+            ${t(
+              "التاريخ",
+              "Date"
+            )}
+          </label>
+
+          <input
+            id="scheduleDate"
+            class="input"
+            type="date"
+            value="2026-10-08"
+            onchange="renderAvailability()"
+          >
+        </div>
+
+        <div class="field">
+          <label>
+            ${t(
+              "الوقت",
+              "Time"
+            )}
+          </label>
+
+          <input
+            id="scheduleTime"
+            class="input"
+            type="time"
+            value="10:00"
+            onchange="renderAvailability()"
+          >
+        </div>
+
+        <div class="field">
+          <label>
+            ${t(
+              "المشروع",
+              "Project"
+            )}
+          </label>
+
+          <select class="input">
+            <option>
+              ${projectName(
+                "P-001"
+              )}
+            </option>
+
+            <option>
+              ${projectName(
+                "P-002"
+              )}
+            </option>
+          </select>
+        </div>
+
+      </div>
+
+      <div class="sectionHead">
+
+        <div>
+          <h2>
+            ${t(
+              "اختر المفتش",
+              "Choose Inspector"
+            )}
+          </h2>
+
+          <p>
+            ${t(
+              "المفتش المشغول في نفس الموعد لا يمكن إسناده",
+              "An inspector already assigned at that time cannot be selected"
+            )}
+          </p>
+        </div>
+
+      </div>
+
+      <div
+        id="inspectorAvailability"
+        class="inspectors"
+      ></div>
+
+      <div class="heroActionRow">
+
+        <button
+          class="button primary"
+          onclick="saveVisit()"
+        >
+          ${icon("calendar-check")}
+          ${t(
+            "حفظ وإرسال للمفتش",
+            "Save & notify inspector"
+          )}
+        </button>
+
+      </div>
+
+    </div>
+
+    <section class="section">
+
+      <div class="card">
+
+        <div class="cardHead">
+
+          <div>
+            <h3>
+              ${t(
+                "الزيارات القادمة",
+                "Upcoming Visits"
+              )}
+            </h3>
+
+            <p>
+              ${t(
+                "إعادة الجدولة أو الإلغاء يحتاج سببًا ويتم حفظ الموعد السابق",
+                "Reschedule or cancellation requires a reason and retains previous schedule"
+              )}
+            </p>
+          </div>
+
+        </div>
+
+        <div class="tableWrap">
+
+          <table>
+
+            <thead>
+              <tr>
+                <th>زيارة</th>
+                <th>المشروع</th>
+                <th>المفتش</th>
+                <th>الموعد</th>
+                <th>الحالة</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody>
+
+              <tr>
+                <td>VIS-2026-000123</td>
+                <td>${projectName("P-001")}</td>
+                <td>${t("خالد السالم","Khaled Al Salem")}</td>
+                <td>08 Oct · 10:00</td>
+                <td>${badge(t("مجدولة","Scheduled"),"info")}</td>
+                <td>
+                  <button
+                    class="button"
+                    onclick="rescheduleVisit()"
+                  >
+                    ${t(
+                      "تعديل",
+                      "Edit"
+                    )}
+                  </button>
+                </td>
+              </tr>
+
+              <tr>
+                <td>VIS-2026-000127</td>
+                <td>${projectName("P-002")}</td>
+                <td>${t("ريم القحطاني","Reem Al Qahtani")}</td>
+                <td>08 Oct · 13:00</td>
+                <td>${badge(t("مجدولة","Scheduled"),"info")}</td>
+                <td>
+                  <button
+                    class="button"
+                    onclick="rescheduleVisit()"
+                  >
+                    ${t(
+                      "تعديل",
+                      "Edit"
+                    )}
+                  </button>
+                </td>
+              </tr>
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </div>
+
+    </section>
+  `;
+}
+
+function availabilityStatus(
+  inspector,
+  date,
+  time
+) {
+  const visits =
+    inspector.visits[date] || [];
+
+  return {
+    busy:
+      visits.includes(time)
+  };
+}
+
+function renderAvailability() {
+  const container =
+    document.querySelector(
+      "#inspectorAvailability"
+    );
+
+  if (!container) {
     return;
   }
 
-  const roles = [
-    [
-      'owner',
-      'مالك النظام',
-      'System Owner',
-      'كل المشاريع + منح تصريح البلاغات',
-      'All projects + sensitive access grants'
-    ],
+  const date =
+    document.querySelector(
+      "#scheduleDate"
+    )?.value ||
+    "2026-10-08";
 
-    [
-      'quality_admin',
-      'إدارة الجودة',
-      'Quality Management',
-      'كل المشاريع التشغيلية',
-      'All operational projects'
-    ],
+  const time =
+    document.querySelector(
+      "#scheduleTime"
+    )?.value ||
+    "10:00";
 
-    [
-      'quality_staff',
-      'موظف الجودة',
-      'Quality Officer',
-      'مراجعة ومتابعة ضمن النطاق',
-      'Review and follow-up in scope'
-    ],
+  container.innerHTML =
+    inspectors
+      .map(inspector => {
+        const result =
+          availabilityStatus(
+            inspector,
+            date,
+            time
+          );
 
-    [
-      'project_manager',
-      'مدير المشروع',
-      'Project Manager',
-      'مشروع الواحة فقط',
-      'Al Waha only'
-    ],
+        return `
+          <div
+            class="
+              inspectorCard
+              ${
+                result.busy
+                  ? "busy"
+                  : "available"
+              }
+              ${
+                state.selectedInspector ===
+                inspector.id
+                  ? "selected"
+                  : ""
+              }
+            "
+            ${
+              result.busy
+                ? ""
+                : `
+                  onclick="
+                    selectInspector(
+                      '${inspector.id}'
+                    )
+                  "
+                `
+            }
+          >
 
-    [
-      'inspector',
-      'مفتش الجودة',
-      'Quality Inspector',
-      'زياراته ونماذجه فقط',
-      'Assigned visits and forms only'
-    ],
+            <div class="inspectorTop">
 
-    [
-      'guard_supervisor',
-      'مشرف الحراس',
-      'Guard Supervisor',
-      'التقييم وطلبات التدريب',
-      'Evaluation and training requests'
-    ],
+              <div>
+                <b>
+                  ${t(
+                    inspector.ar,
+                    inspector.en
+                  )}
+                </b>
 
-    [
-      'guard',
-      'حارس الأمن',
-      'Security Guard',
-      'الخدمات الشخصية والبلاغات',
-      'Personal services and reports'
-    ]
-  ];
+                <span>
+                  ${inspector.emp}
+                </span>
+              </div>
 
-  menu.innerHTML = roles
-    .map(role => {
-      return `
-        <button data-r="${role[0]}">
-          <span class="rdot"></span>
+              ${badge(
+                result.busy
+                  ? t(
+                      "مجدول",
+                      "Busy"
+                    )
+                  : t(
+                      "متاح",
+                      "Available"
+                    ),
+                result.busy
+                  ? "danger"
+                  : "success"
+              )}
 
-          <div>
-            <b>
-              ${t(role[1], role[2])}
-            </b>
+            </div>
 
-            <small>
-              ${t(role[3], role[4])}
-            </small>
+            <div class="availabilityState">
+
+              <span
+                class="
+                  availabilityDot
+                  ${
+                    result.busy
+                      ? "busy"
+                      : "available"
+                  }
+                "
+              ></span>
+
+              ${
+                result.busy
+                  ? t(
+                      `لديه زيارة الساعة ${time}`,
+                      `Has a visit at ${time}`
+                    )
+                  : t(
+                      "لا يوجد تعارض",
+                      "No conflict"
+                    )
+              }
+
+            </div>
+
           </div>
-        </button>
-      `;
-    })
-    .join('');
+        `;
+      })
+      .join("");
 
-  menu.querySelectorAll('button').forEach(button => {
-    button.onclick = () => {
-      S.role = button.dataset.r;
-
-      if (!allowed(S.view)) {
-        S.view = S.role === 'guard'
-          ? 'confidential'
-          : 'dashboard';
-      }
-
-      menu.classList.remove('open');
-
-      updateRole();
-
-      toast(
-        t(
-          'تم تبديل الحساب التجريبي',
-          'Demo account switched'
-        )
-      );
-    };
-  });
+  refreshIcons();
 }
 
-function updateStatic() {
-  const map = [
-    [
-      '#brandSub',
-      'إدارة الجودة الأمنية',
-      'Security Quality Management'
-    ],
+function selectInspector(id) {
+  state.selectedInspector = id;
 
-    [
-      '#demoLabel',
-      'نسخة تجريبية ببيانات وهمية',
-      'Interactive demo with mock data'
-    ],
-
-    [
-      '#sideFootTitle',
-      'نطاقات وصول حقيقية في النظام النهائي',
-      'Server-enforced access scopes in production'
-    ],
-
-    [
-      '#sideFootSub',
-      'الديمو يحاكي الواجهة وتدفق الصلاحيات',
-      'This demo simulates UI and permission flows'
-    ],
-
-    [
-      '#searchLabel',
-      'بحث سريع',
-      'Quick search'
-    ],
-
-    [
-      '#searchHint',
-      'النتائج تخضع لصلاحيات الحساب الحالي والبلاغات الحساسة لا تظهر في البحث العام',
-      'Results follow the current account scope and sensitive reports never appear in global search'
-    ]
-  ];
-
-  map.forEach(item => {
-    const element = document.querySelector(item[0]);
-
-    if (element) {
-      element.textContent = t(item[1], item[2]);
-    }
-  });
-
-  const searchInput = document.querySelector('#globalSearch');
-
-  if (searchInput) {
-    searchInput.placeholder = t(
-      'ابحث بالاسم أو الهوية أو الرقم الوظيفي أو رقم الحالة',
-      'Search by name ID employee no or case reference'
-    );
-  }
+  renderAvailability();
 }
 
-function updateRole() {
-  const meta = ROLE_META[S.role];
-
-  const avatar = document.querySelector('.avatar');
-  const roleName = document.querySelector('#roleName');
-  const roleScope = document.querySelector('#roleScope');
-
-  if (avatar) {
-    avatar.textContent = S.lang === 'ar'
-      ? 'س'
-      : 'S';
-  }
-
-  if (roleName) {
-    roleName.textContent = t(
-      meta.ar,
-      meta.en
-    );
-  }
-
-  if (roleScope) {
-    roleScope.textContent = t(
-      meta.sar,
-      meta.sen
-    );
-  }
-
-  setupRoles();
-  setupNav();
-  render();
-}
-
-function go(view) {
-  if (!allowed(view)) {
+function saveVisit() {
+  if (!state.selectedInspector) {
     toast(
       t(
-        'هذا القسم غير متاح للحساب الحالي',
-        'This section is not available to the current account'
+        "اختار مفتشًا متاحًا أولًا",
+        "Choose an available inspector first"
       )
     );
 
     return;
   }
 
-  S.view = view;
-
-  render();
-
-  const sidebar = document.querySelector('#sidebar');
-
-  if (sidebar) {
-    sidebar.classList.remove('open');
-  }
-
-  window.scrollTo({
-    top: 0,
-    behavior: 'smooth'
-  });
-}
-
-function stat(
-  icon,
-  ar,
-  en,
-  value,
-  trend,
-  cls = ''
-) {
-  return `
-    <div class="stat">
-      <div class="statIcon ${cls}">
-        ${I(icon)}
-      </div>
-
-      <strong>
-        ${value}
-      </strong>
-
-      <span>
-        ${t(ar, en)}
-      </span>
-
-      <div class="trend">
-        ${trend}
-      </div>
-    </div>
-  `;
-}
-
-function listItem(
-  icon,
-  title,
-  sub,
-  end = ''
-) {
-  return `
-    <div class="item">
-      <div class="itemIcon">
-        ${I(icon)}
-      </div>
-
-      <div class="itemMain">
-        <b>
-          ${title}
-        </b>
-
-        <span>
-          ${sub}
-        </span>
-      </div>
-
-      ${end}
-    </div>
-  `;
-}
-
-function toolbar(
-  ar,
-  en,
-  subAr,
-  subEn,
-  actions = ''
-) {
-  return `
-    <div class="toolbar">
-      <div>
-        <h2 class="cardTitle">
-          ${t(ar, en)}
-        </h2>
-
-        <p class="sub">
-          ${t(subAr, subEn)}
-        </p>
-      </div>
-
-      ${actions}
-    </div>
-  `;
-}
-
-function hero() {
-  let title = t(
-    'من الزيارة الميدانية إلى قرار موثق في مسار واحد',
-    'From field visit to a documented decision in one workflow'
-  );
-
-  let description = t(
-    'متابعة التفتيش والمراجعة والإجراءات والتقارير مع فصل الصلاحيات حسب الدور والمشروع',
-    'Inspection review corrective actions and reporting with strict role and project scope'
-  );
-
-  if (S.role === 'inspector') {
-    title = t(
-      'زياراتك الميدانية في مكان واحد',
-      'Your field visits in one place'
-    );
-
-    description = t(
-      'ابدأ الزيارة واحفظ المسودة وارفع الأدلة واستكمل ما يعاد إليك بدون الاطلاع على نتائج وتحليلات المشاريع',
-      'Start assigned visits save drafts upload evidence and complete returned work without project analytics access'
-    );
-  }
-
-  if (S.role === 'project_manager') {
-    title = t(
-      'نظرة تشغيلية على مشروع الواحة',
-      'Operational view of Al Waha'
-    );
-
-    description = t(
-      'تظهر لك بيانات المشروع المسند فقط مع تقاريره وتحليلاته وإجراءاته وطلبات التدريب',
-      'Only your assigned project is visible with reports analytics actions and training approvals'
-    );
-  }
-
-  if (S.role === 'guard_supervisor') {
-    title = t(
-      'متابعة الحراس والتدريب',
-      'Guard evaluation and training'
-    );
-
-    description = t(
-      'قيّم الحراس ضمن نطاقك وارفع طلبات التدريب وتابع مسار الموافقة',
-      'Evaluate guards in scope raise training requests and track approvals'
-    );
-  }
-
-  return `
-    <section class="hero">
-      <div class="heroGrid">
-        <div>
-          <div class="kicker">
-            ${I('shield-check')}
-
-            Security Quality Management System
-          </div>
-
-          <h2>
-            ${title}
-          </h2>
-
-          <p>
-            ${description}
-          </p>
-        </div>
-
-        <div class="systemCard">
-          <div class="systemHead">
-            <b>
-              ${t(
-                'حالة النظام',
-                'System status'
-              )}
-            </b>
-
-            <span class="live"></span>
-          </div>
-
-          <div class="miniGrid">
-            <div class="mini">
-              <b>99.9%</b>
-
-              <span>
-                ${t(
-                  'جاهزية الخدمة',
-                  'Availability'
-                )}
-              </span>
-            </div>
-
-            <div class="mini">
-              <b>0</b>
-
-              <span>
-                ${t(
-                  'محاولات وصول غير مصرح',
-                  'Unauthorized attempts'
-                )}
-              </span>
-            </div>
-
-            <div class="mini">
-              <b>04:10</b>
-
-              <span>
-                ${t(
-                  'آخر نسخة احتياطية',
-                  'Last backup'
-                )}
-              </span>
-            </div>
-
-            <div class="mini">
-              <b>v2.4</b>
-
-              <span>
-                ${t(
-                  'إصدار نموذج نشط',
-                  'Active form version'
-                )}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function dashboard() {
-  const secondCard =
-    S.role === 'inspector'
-      ? stat(
-          'undo-2',
-          'معاد لي للاستكمال',
-          'Returned to me',
-          '2',
-          t(
-            'تحتاج استكمال',
-            'Need completion'
-          ),
-          'gold'
-        )
-      : stat(
-          'badge-check',
-          'متوسط الالتزام',
-          'Average compliance',
-          S.role === 'project_manager'
-            ? '92%'
-            : '88%',
-          '+3.2%',
-          'gold'
-        );
-
-  const fourthCard =
-    S.role === 'inspector'
-      ? stat(
-          'save',
-          'مسوداتي',
-          'My drafts',
-          '1',
-          t(
-            'محفوظة',
-            'Saved'
-          ),
-          'blue'
-        )
-      : stat(
-          'timer',
-          'بانتظار المراجعة',
-          'Pending review',
-          '6',
-          t(
-            '+1 اليوم',
-            '+1 today'
-          ),
-          'blue'
-        );
-
-  return `
-    <div class="view">
-      ${hero()}
-
-      <div class="stats">
-        ${stat(
-          'clipboard-check',
-          S.role === 'inspector'
-            ? 'زياراتي اليوم'
-            : 'زيارات اليوم',
-          S.role === 'inspector'
-            ? 'My visits today'
-            : 'Visits today',
-          S.role === 'inspector'
-            ? '3'
-            : '12',
-          '+8%'
-        )}
-
-        ${secondCard}
-
-        ${stat(
-          'triangle-alert',
-          'إجراءات مفتوحة',
-          'Open actions',
-          S.role === 'project_manager'
-            ? '3'
-            : '9',
-          t(
-            '-2 هذا الأسبوع',
-            '-2 this week'
-          ),
-          'red'
-        )}
-
-        ${fourthCard}
-      </div>
-
-      <div class="grid2">
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'النشاط والزيارات القادمة',
-                  'Activity & upcoming visits'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'آخر التحديثات ضمن نطاق الحساب',
-                  'Latest updates within account scope'
-                )}
-              </p>
-            </div>
-
-            <button
-              class="btn secondary"
-              onclick="go('schedule')"
-            >
-              ${I('calendar')}
-
-              ${t(
-                'عرض الجدول',
-                'View schedule'
-              )}
-            </button>
-          </div>
-
-          <div class="list">
-            ${listItem(
-              'map-pinned',
-              'VIS-2026-000123',
-              `${projectName('P-001')} · ${t(
-                'اليوم 10:30',
-                'Today 10:30'
-              )}`,
-              t(
-                'اليوم',
-                'Today'
-              )
-            )}
-
-            ${
-              S.role === 'inspector'
-                ? ''
-                : listItem(
-                    'clipboard-check',
-                    'VIS-2026-000127',
-                    `${projectName('P-002')} · ${t(
-                      'وردية مسائية',
-                      'Evening shift'
-                    )}`,
-                    t(
-                      'غدًا',
-                      'Tomorrow'
-                    )
-                  )
-            }
-
-            ${listItem(
-              'refresh-cw',
-              'VIS-2026-000131',
-              `${t(
-                'جولة متابعة',
-                'Follow-up visit'
-              )} · ${projectName('P-001')}`,
-              '07 Oct'
-            )}
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${
-                  S.role === 'inspector'
-                    ? t(
-                        'حدود حساب المفتش',
-                        'Inspector account boundary'
-                      )
-                    : t(
-                        'تطور الالتزام',
-                        'Compliance trend'
-                      )
-                }
-              </h3>
-
-              <p class="sub">
-                ${
-                  S.role === 'inspector'
-                    ? t(
-                        'المفتش لا يطلع على نتائج المشاريع أو تحليلاتها',
-                        'Inspector cannot access project results or analytics'
-                      )
-                    : t(
-                        'الزيارات المعتمدة فقط تدخل في المؤشر الرسمي',
-                        'Only approved inspections feed official comparisons'
-                      )
-                }
-              </p>
-            </div>
-          </div>
-
-          ${
-            S.role === 'inspector'
-              ? `
-                <div class="sensitive">
-                  ${I('eye-off')}
-
-                  <div>
-                    <b>
-                      ${t(
-                        'النتائج مخفية عن هذا الدور',
-                        'Results hidden for this role'
-                      )}
-                    </b>
-
-                    <p>
-                      ${t(
-                        'المفتش يعبئ ويرفع الأدلة ويحفظ المسودة ويكمل ما يعاد إليه فقط',
-                        'Inspector fills forms uploads evidence saves drafts and completes returned work only'
-                      )}
-                    </p>
-                  </div>
-                </div>
-              `
-              : `
-                <div class="chart">
-                  ${[
-                    62,
-                    69,
-                    73,
-                    71,
-                    84,
-                    91
-                  ]
-                    .map(
-                      (
-                        height,
-                        index
-                      ) => {
-                        const arMonths = [
-                          'مايو',
-                          'يونيو',
-                          'يوليو',
-                          'أغسطس',
-                          'سبتمبر',
-                          'أكتوبر'
-                        ];
-
-                        const enMonths = [
-                          'May',
-                          'Jun',
-                          'Jul',
-                          'Aug',
-                          'Sep',
-                          'Oct'
-                        ];
-
-                        return `
-                          <div class="barCol">
-                            <div
-                              class="bar ${
-                                index === 5
-                                  ? 'gold'
-                                  : ''
-                              }"
-                              style="height:${height}%"
-                            ></div>
-
-                            <span>
-                              ${t(
-                                arMonths[index],
-                                enMonths[index]
-                              )}
-                            </span>
-                          </div>
-                        `;
-                      }
-                    )
-                    .join('')}
-                </div>
-              `
-          }
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function projectView() {
-  const data =
-    S.role === 'project_manager'
-      ? projects.filter(
-          project => project.id === 'P-001'
-        )
-      : projects;
-
-  return `
-    <div class="view">
-      ${toolbar(
-        'المشاريع والمناطق',
-        'Projects & Regions',
-        'كل مشروع له ملف مستقل وسجل زيارات وملاحظات وإجراءات وتحليلات',
-        'Each project has a dedicated profile visits findings actions and analytics',
-        ['owner', 'quality_admin'].includes(S.role)
-          ? `
-            <button
-              class="btn primary"
-              onclick="projectModal()"
-            >
-              ${I('plus')}
-
-              ${t(
-                'إضافة مشروع',
-                'Add project'
-              )}
-            </button>
-          `
-          : ''
-      )}
-
-      <div class="projects">
-        ${data
-          .map(project => {
-            return `
-              <article class="project">
-                <div class="projectTop">
-                  <div>
-                    <span class="code">
-                      ${project.code}
-                    </span>
-
-                    <h3>
-                      ${
-                        S.lang === 'ar'
-                          ? project.ar
-                          : project.en
-                      }
-                    </h3>
-
-                    <p>
-                      ${
-                        S.lang === 'ar'
-                          ? project.regionAr
-                          : project.regionEn
-                      }
-                    </p>
-                  </div>
-
-                  ${B(
-                    t(
-                      'نشط',
-                      'Active'
-                    ),
-                    'success'
-                  )}
-                </div>
-
-                <div class="pmetrics">
-                  <div>
-                    <b>
-                      ${project.score}%
-                    </b>
-
-                    <span>
-                      ${t(
-                        'التقييم',
-                        'Score'
-                      )}
-                    </span>
-                  </div>
-
-                  <div>
-                    <b>
-                      ${project.visits}
-                    </b>
-
-                    <span>
-                      ${t(
-                        'زيارة',
-                        'Visits'
-                      )}
-                    </span>
-                  </div>
-
-                  <div>
-                    <b>
-                      ${project.open}
-                    </b>
-
-                    <span>
-                      ${t(
-                        'إجراءات مفتوحة',
-                        'Open actions'
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                <div class="progress">
-                  <span
-                    style="width:${project.score}%"
-                  ></span>
-                </div>
-
-                <div
-                  style="
-                    display:flex;
-                    gap:7px;
-                    margin-top:13px;
-                    flex-wrap:wrap
-                  "
-                >
-                  <button
-                    class="btn secondary"
-                    onclick="openProject('${project.id}')"
-                  >
-                    ${I('arrow-up-left')}
-
-                    ${t(
-                      'فتح المشروع',
-                      'Open project'
-                    )}
-                  </button>
-
-                  <button
-                    class="btn"
-                    onclick="go('analytics')"
-                  >
-                    ${I('chart-column')}
-
-                    ${t(
-                      'التحليل',
-                      'Analytics'
-                    )}
-                  </button>
-                </div>
-              </article>
-            `;
-          })
-          .join('')}
-      </div>
-    </div>
-  `;
-}
-
-function visitData() {
-  let data = [
-    {
-      id: 'VIS-2026-000123',
-      project: 'P-001',
-      time: t(
-        '04 أكتوبر · 10:30',
-        '04 Oct · 10:30'
-      ),
-      type: t(
-        'دوري',
-        'Routine'
-      ),
-      shift: t(
-        'صباحية',
-        'Morning'
-      ),
-      status: t(
-        'مجدولة',
-        'Scheduled'
-      ),
-      assignee: 'me'
-    },
-
-    {
-      id: 'VIS-2026-000127',
-      project: 'P-002',
-      time: t(
-        '07 أكتوبر · 18:00',
-        '07 Oct · 18:00'
-      ),
-      type: t(
-        'مفاجئ',
-        'Surprise'
-      ),
-      shift: t(
-        'مسائية',
-        'Evening'
-      ),
-      status: t(
-        'مجدولة',
-        'Scheduled'
-      ),
-      assignee: 'other'
-    },
-
-    {
-      id: 'VIS-2026-000118',
-      project: 'P-001',
-      time: t(
-        '01 أكتوبر · 09:00',
-        '01 Oct · 09:00'
-      ),
-      type: t(
-        'متابعة',
-        'Follow-up'
-      ),
-      shift: t(
-        'صباحية',
-        'Morning'
-      ),
-      status: t(
-        'منفذة',
-        'Completed'
-      ),
-      assignee: 'me'
-    }
-  ];
-
-  if (
-    S.role === 'project_manager' ||
-    S.role === 'guard_supervisor'
-  ) {
-    data = data.filter(
-      item => item.project === 'P-001'
-    );
-  }
-
-  if (S.role === 'inspector') {
-    data = data.filter(
-      item => item.assignee === 'me'
-    );
-  }
-
-  return data;
-}
-
-function visitRows() {
-  return `
-    <div class="table">
-      <table>
-        <thead>
-          <tr>
-            <th>
-              ${t(
-                'الزيارة',
-                'Visit'
-              )}
-            </th>
-
-            <th>
-              ${t(
-                'المشروع',
-                'Project'
-              )}
-            </th>
-
-            <th>
-              ${t(
-                'التاريخ',
-                'Date'
-              )}
-            </th>
-
-            <th>
-              ${t(
-                'النوع',
-                'Type'
-              )}
-            </th>
-
-            <th>
-              ${t(
-                'الوردية',
-                'Shift'
-              )}
-            </th>
-
-            <th>
-              ${t(
-                'الحالة',
-                'Status'
-              )}
-            </th>
-
-            <th></th>
-          </tr>
-        </thead>
-
-        <tbody>
-          ${visitData()
-            .map(row => {
-              return `
-                <tr>
-                  <td>
-                    <b>
-                      ${row.id}
-                    </b>
-                  </td>
-
-                  <td>
-                    ${projectName(
-                      row.project
-                    )}
-                  </td>
-
-                  <td>
-                    ${row.time}
-                  </td>
-
-                  <td>
-                    ${row.type}
-                  </td>
-
-                  <td>
-                    ${row.shift}
-                  </td>
-
-                  <td>
-                    ${B(
-                      row.status,
-                      row.status ===
-                        t(
-                          'منفذة',
-                          'Completed'
-                        )
-                        ? 'success'
-                        : 'info'
-                    )}
-                  </td>
-
-                  <td>
-                    <button
-                      class="btn"
-                      onclick="go('inspection')"
-                    >
-                      ${t(
-                        'فتح',
-                        'Open'
-                      )}
-                    </button>
-                  </td>
-                </tr>
-              `;
-            })
-            .join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-function inspectorStatus(
-  inspector,
-  date,
-  time
-) {
-  const slots =
-    inspector.visits[date] || [];
-
-  return {
-    busy: slots.includes(time),
-    slots
-  };
-}
-
-function availabilityCards(
-  date = '2026-10-08',
-  time = '10:00'
-) {
-  return inspectors
-    .map(inspector => {
-      const status =
-        inspectorStatus(
-          inspector,
-          date,
-          time
-        );
-
-      const label =
-        status.busy
-          ? t(
-              'مجدول مسبقًا',
-              'Already scheduled'
-            )
-          : t(
-              'متاح',
-              'Available'
-            );
-
-      const details =
-        status.busy
-          ? t(
-              `لديه زيارة الساعة ${time}`,
-              `Has a visit at ${time}`
-            )
-          : t(
-              'لا يوجد تعارض في هذا التوقيت',
-              'No conflict at this time'
-            );
-
-      return `
-        <button
-          class="
-            availabilityCard
-            ${
-              status.busy
-                ? 'busy'
-                : 'available'
-            }
-            ${
-              S.selectedInspector === inspector.id
-                ? 'selected'
-                : ''
-            }
-          "
-          ${
-            status.busy
-              ? 'disabled'
-              : ''
-          }
-          onclick="chooseInspector('${inspector.id}')"
-        >
-          <div class="availabilityIcon">
-            ${I(
-              status.busy
-                ? 'calendar-x-2'
-                : 'calendar-check-2'
-            )}
-          </div>
-
-          <div>
-            <b>
-              ${t(
-                inspector.ar,
-                inspector.en
-              )}
-            </b>
-
-            <span>
-              ${inspector.employee}
-              ·
-              ${details}
-            </span>
-          </div>
-
-          ${B(
-            label,
-            status.busy
-              ? 'danger'
-              : 'success'
-          )}
-        </button>
-      `;
-    })
-    .join('');
-}
-
-function chooseInspector(id) {
-  S.selectedInspector = id;
-
-  updateAvailability();
-
   toast(
     t(
-      'تم اختيار المفتش المتاح',
-      'Available inspector selected'
+      "تمت جدولة الزيارة وإرسال إشعار للمفتش",
+      "Visit scheduled and inspector notified"
     )
   );
 }
 
-function updateAvailability() {
-  const date =
-    document.querySelector(
-      '#visitDate'
-    )?.value ||
-    '2026-10-08';
+function rescheduleVisit() {
+  modal(`
+    <h2>
+      ${t(
+        "إعادة جدولة أو إلغاء",
+        "Reschedule or Cancel"
+      )}
+    </h2>
 
-  const time =
-    document.querySelector(
-      '#visitTime'
-    )?.value ||
-    '10:00';
+    <div class="field">
 
-  const box =
-    document.querySelector(
-      '#inspectorAvailability'
-    );
+      <label>
+        ${t(
+          "الإجراء",
+          "Action"
+        )}
+      </label>
 
-  if (box) {
-    box.innerHTML =
-      availabilityCards(
-        date,
-        time
-      );
+      <select class="input">
+        <option>
+          ${t(
+            "إعادة جدولة",
+            "Reschedule"
+          )}
+        </option>
 
-    icons();
-  }
+        <option>
+          ${t(
+            "إلغاء",
+            "Cancel"
+          )}
+        </option>
+      </select>
+
+    </div>
+
+    <div class="field">
+
+      <label>
+        ${t(
+          "السبب",
+          "Reason"
+        )}
+      </label>
+
+      <textarea
+        class="input"
+        placeholder="${t(
+          "السبب إلزامي ويتم حفظه تاريخيًا",
+          "Reason is mandatory and retained historically"
+        )}"
+      ></textarea>
+
+    </div>
+
+    <div class="permissionNotice">
+
+      ${icon("history")}
+
+      <span>
+        ${t(
+          "النظام يحتفظ بالموعد السابق والجديد واسم المستخدم ووقت التعديل",
+          "The system retains previous and new schedule user and change timestamp"
+        )}
+      </span>
+
+    </div>
+
+    <button
+      class="button primary"
+      style="margin-top:14px"
+      onclick="
+        toast(
+          t(
+            'تم تسجيل التعديل',
+            'Change recorded'
+          )
+        );
+        closeModal()
+      "
+    >
+      ${t(
+        "حفظ",
+        "Save"
+      )}
+    </button>
+  `);
 }
 
-function schedule() {
-  const days = [
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
-    8,
-    9,
-    10,
-    11,
-    12,
-    13,
-    14
-  ];
-
-  const action =
-    S.role === 'quality_admin'
-      ? `
-        <button
-          class="btn primary"
-          onclick="visitModal()"
-        >
-          ${I('plus')}
-
-          ${t(
-            'جدولة زيارة',
-            'Schedule visit'
-          )}
-        </button>
-      `
-      : S.role === 'owner'
-        ? B(
-            t(
-              'عرض فقط — الجدولة من إدارة الجودة',
-              'View only — scheduling by Quality Management'
-            ),
-            'info'
-          )
-        : '';
-
+function myVisitsPage() {
   return `
-    <div class="view">
-      ${toolbar(
-        'جدول التفتيش الميداني',
-        'Field Inspection Schedule',
-        'الجدولة والتعديل والإلغاء من إدارة الجودة فقط وكل مفتش يرى جدوله فقط',
-        'Only Quality Management can schedule reschedule or cancel and inspectors see only their own assignments',
-        action
-      )}
+    ${pageIntro(
+      "MY FIELD VISITS",
+      t(
+        "زياراتي",
+        "My Visits"
+      ),
+      t(
+        "تظهر فقط الزيارات المسندة إلى حساب المفتش الحالي",
+        "Only visits assigned to the current inspector are shown"
+      )
+    )}
 
-      ${
-        S.role === 'quality_admin'
-          ? `
-            <div class="card availabilitySummary">
-              <div class="cardHead">
-                <div>
-                  <h3 class="cardTitle">
-                    ${t(
-                      'توافر المفتشين قبل الإسناد',
-                      'Inspector availability before assignment'
-                    )}
-                  </h3>
+    <div class="grid2">
 
-                  <p class="sub">
-                    ${t(
-                      'عند اختيار اليوم والوقت تظهر حالة كل مفتش لتجنب التعارض',
-                      'Choose date and time to see availability and prevent conflicts'
-                    )}
-                  </p>
-                </div>
+      <div class="card">
 
-                <button
-                  class="btn secondary"
-                  onclick="visitModal()"
-                >
-                  ${I('users')}
-
-                  ${t(
-                    'فحص التوافر وجدولة',
-                    'Check availability & schedule'
-                  )}
-                </button>
-              </div>
-
-              <div class="availabilityMini">
-                ${inspectors
-                  .map(
-                    (
-                      inspector,
-                      index
-                    ) => {
-                      const busy =
-                        index === 0 ||
-                        index === 2;
-
-                      return `
-                        <div class="availabilityMiniItem">
-                          <span
-                            class="
-                              availabilityDot
-                              ${
-                                busy
-                                  ? 'busy'
-                                  : 'available'
-                              }
-                            "
-                          ></span>
-
-                          <div>
-                            <b>
-                              ${t(
-                                inspector.ar,
-                                inspector.en
-                              )}
-                            </b>
-
-                            <small>
-                              ${
-                                busy
-                                  ? t(
-                                      'مشغول 10:00',
-                                      'Busy at 10:00'
-                                    )
-                                  : t(
-                                      'متاح 10:00',
-                                      'Available at 10:00'
-                                    )
-                              }
-                            </small>
-                          </div>
-                        </div>
-                      `;
-                    }
-                  )
-                  .join('')}
-              </div>
-            </div>
-          `
-          : ''
-      }
-
-      <div
-        class="card"
-        style="margin-top:14px"
-      >
-        <div class="tabs">
-          <button class="tab">
-            ${t(
-              'يومي',
-              'Day'
-            )}
-          </button>
-
-          <button class="tab">
-            ${t(
-              'أسبوعي',
-              'Week'
-            )}
-          </button>
-
-          <button class="tab active">
-            ${t(
-              'شهري',
-              'Month'
-            )}
-          </button>
-
-          <button class="tab">
-            ${t(
-              'سنوي',
-              'Year'
-            )}
-          </button>
-        </div>
-
-        <div class="calendar">
-          ${days
-            .map(day => {
-              return `
-                <div class="day">
-                  <span class="num">
-                    ${day}
-                  </span>
-
-                  ${
-                    day === 4
-                      ? `
-                        <div class="event">
-                          10:30
-                          ·
-                          ${projectName('P-001')}
-
-                          <br>
-
-                          VIS-000123
-                        </div>
-                      `
-                      : ''
-                  }
-
-                  ${
-                    day === 7 &&
-                    S.role !== 'inspector'
-                      ? `
-                        <div class="event gold">
-                          18:00
-                          ·
-                          ${projectName('P-002')}
-
-                          <br>
-
-                          VIS-000127
-                        </div>
-                      `
-                      : ''
-                  }
-
-                  ${
-                    day === 11
-                      ? `
-                        <div class="event">
-                          09:00
-                          ·
-                          ${projectName('P-001')}
-
-                          <br>
-
-                          VIS-000131
-                        </div>
-                      `
-                      : ''
-                  }
-                </div>
-              `;
-            })
-            .join('')}
-        </div>
-      </div>
-
-      <div
-        class="card"
-        style="margin-top:14px"
-      >
         <div class="cardHead">
           <div>
-            <h3 class="cardTitle">
+            <h3>
               ${t(
-                'الزيارات القادمة',
-                'Upcoming visits'
+                "اليوم",
+                "Today"
               )}
             </h3>
-
-            <p class="sub">
-              ${t(
-                'المفتش يرى مواعيده فقط ولا يعدل جدول غيره',
-                'Inspector sees only own schedule and cannot edit others'
-              )}
-            </p>
           </div>
 
-          ${
-            S.role === 'quality_admin'
-              ? `
-                <button
-                  class="btn"
-                  onclick="rescheduleModal()"
-                >
-                  ${I('calendar-sync')}
-
-                  ${t(
-                    'إعادة جدولة أو إلغاء',
-                    'Reschedule / Cancel'
-                  )}
-                </button>
-              `
-              : ''
-          }
+          ${badge(
+            "3",
+            "info"
+          )}
         </div>
 
-        ${visitRows()}
+        <div class="list">
+
+          ${listItem(
+            "map-pin-check",
+            "VIS-2026-000123",
+            t(
+              "10:30 · مشروع الواحة · تفتيش دوري",
+              "10:30 · Al Waha · Routine inspection"
+            ),
+            `
+              <button
+                class="button primary"
+                onclick="go('inspection')"
+              >
+                ${t(
+                  "ابدأ",
+                  "Start"
+                )}
+              </button>
+            `
+          )}
+
+          ${listItem(
+            "map-pin-check",
+            "VIS-2026-000128",
+            t(
+              "13:30 · مشروع الواحة · متابعة",
+              "13:30 · Al Waha · Follow-up"
+            ),
+            badge(
+              t(
+                "لاحقًا",
+                "Later"
+              ),
+              "neutral"
+            )
+          )}
+
+        </div>
+
       </div>
+
+      <div class="card">
+
+        <div class="cardHead">
+          <div>
+            <h3>
+              ${t(
+                "هذا الأسبوع",
+                "This Week"
+              )}
+            </h3>
+          </div>
+        </div>
+
+        <div class="list">
+
+          ${listItem(
+            "calendar",
+            "VIS-2026-000135",
+            t(
+              "09 أكتوبر · 09:00",
+              "09 Oct · 09:00"
+            ),
+            badge(
+              t(
+                "مجدولة",
+                "Scheduled"
+              ),
+              "info"
+            )
+          )}
+
+          ${listItem(
+            "calendar",
+            "VIS-2026-000140",
+            t(
+              "10 أكتوبر · 16:00",
+              "10 Oct · 16:00"
+            ),
+            badge(
+              t(
+                "مجدولة",
+                "Scheduled"
+              ),
+              "info"
+            )
+          )}
+
+        </div>
+
+      </div>
+
     </div>
   `;
 }
 
-function score() {
+function complianceScore() {
   const weights = {
     a: 10,
     b: 20,
@@ -1977,6510 +3343,766 @@ function score() {
     d: 40
   };
 
-  let numerator = 0;
-  let denominator = 0;
+  let compliant = 0;
+  let applicable = 0;
 
-  Object.keys(weights).forEach(
-    key => {
+  Object.keys(
+    weights
+  ).forEach(key => {
+    if (
+      state.answers[key] !==
+      "na"
+    ) {
+      applicable +=
+        weights[key];
+
       if (
-        S.answers[key] !== 'na'
+        state.answers[key] ===
+        "ok"
       ) {
-        denominator +=
+        compliant +=
           weights[key];
-
-        if (
-          S.answers[key] === 'ok'
-        ) {
-          numerator +=
-            weights[key];
-        }
       }
     }
-  );
+  });
 
-  if (!denominator) {
+  if (!applicable) {
     return null;
   }
 
   return Math.round(
-    numerator /
-      denominator *
+    compliant /
+      applicable *
       100
   );
 }
 
-function question(
+function inspectionQuestion(
   id,
-  ar,
-  en,
-  descAr,
-  descEn,
+  title,
+  description,
   weight
 ) {
   const answer =
-    S.answers[id];
+    state.answers[id];
 
   return `
     <div class="question">
-      <div class="qHead">
+
+      <div class="questionHead">
+
         <div>
-          <h4>
-            ${t(ar, en)}
-          </h4>
+          <b>
+            ${title}
+          </b>
 
           <p>
-            ${t(
-              descAr,
-              descEn
-            )}
+            ${description}
           </p>
         </div>
 
-        <span class="weight">
+        <span>
           ${t(
-            'وزن',
-            'Weight'
+            "وزن",
+            "Weight"
           )}
           ${weight}
         </span>
+
       </div>
 
       <div class="answers">
+
         <button
           class="
-            ans
+            answer
             ${
-              answer === 'ok'
-                ? 'ok active'
-                : ''
+              answer === "ok"
+                ? "selected ok"
+                : ""
             }
           "
-          onclick="answer('${id}','ok')"
+          onclick="
+            answerQuestion(
+              '${id}',
+              'ok'
+            )
+          "
         >
-          ${I('check')}
-
+          ${icon("check")}
           ${t(
-            'مطابق',
-            'Compliant'
+            "مطابق",
+            "Compliant"
           )}
         </button>
 
         <button
           class="
-            ans
+            answer
             ${
-              answer === 'fail'
-                ? 'fail active'
-                : ''
+              answer === "fail"
+                ? "selected fail"
+                : ""
             }
           "
-          onclick="answer('${id}','fail')"
+          onclick="
+            answerQuestion(
+              '${id}',
+              'fail'
+            )
+          "
         >
-          ${I('x')}
-
+          ${icon("x")}
           ${t(
-            'غير مطابق',
-            'Non-compliant'
+            "غير مطابق",
+            "Non-compliant"
           )}
         </button>
 
         <button
           class="
-            ans
+            answer
             ${
-              answer === 'na'
-                ? 'na active'
-                : ''
+              answer === "na"
+                ? "selected na"
+                : ""
             }
           "
-          onclick="answer('${id}','na')"
+          onclick="
+            answerQuestion(
+              '${id}',
+              'na'
+            )
+          "
         >
-          ${I('minus')}
-
+          ${icon("minus")}
           ${t(
-            'لا ينطبق',
-            'N/A'
+            "لا ينطبق",
+            "N/A"
           )}
         </button>
+
       </div>
+
     </div>
   `;
 }
 
-function scoreRing() {
-  const value = score();
+function inspectionPage() {
+  const score =
+    complianceScore();
 
   return `
-    <div
-      class="score"
-      style="
-        background:
-          conic-gradient(
-            var(--teal)
-            0
-            ${value || 0}%,
-            rgba(255,255,255,.06)
-            ${value || 0}%
-            100%
-          )
-      "
-    >
-      <div>
-        <b>
-          ${
-            value === null
-              ? '—'
-              : value + '%'
-          }
-        </b>
+    ${pageIntro(
+      "FIELD INSPECTION",
+      t(
+        "تنفيذ الزيارة",
+        "Execute Visit"
+      ),
+      t(
+        "المفتش يركز على المهمة الحالية فقط ولا يرى نتيجة المشروع أو المقارنات",
+        "Inspector focuses only on the current task without project analytics or comparisons"
+      ),
+      `
+        <button
+          class="button"
+          onclick="
+            toast(
+              t(
+                'تم حفظ المسودة',
+                'Draft saved'
+              )
+            )
+          "
+        >
+          ${icon("save")}
+          ${t(
+            "حفظ مسودة",
+            "Save draft"
+          )}
+        </button>
+      `
+    )}
 
-        <span>
-          ${
-            value === null
-              ? t(
-                  'غير قابلة للاحتساب',
-                  'Not calculable'
-                )
-              : t(
-                  'نسبة مطابقة الزيارة',
-                  'Visit compliance'
-                )
-          }
+    ${routeStrip(1)}
+
+    <div class="visitHero">
+
+      <div class="visitInfo">
+
+        <span class="eyebrow">
+          VIS-2026-000123
         </span>
-      </div>
-    </div>
-  `;
-}
 
-function findingClassificationPanel() {
-  return `
-    <div class="card findingCard">
-      <div class="cardHead">
-        <div>
-          <h3 class="cardTitle">
-            ${t(
-              'تصنيف الملاحظة الناتجة عن البند غير المطابق',
-              'Classify the finding created by the non-compliant item'
-            )}
-          </h3>
+        <h2>
+          ${projectName(
+            "P-001"
+          )}
+        </h2>
 
-          <p class="sub">
+        <p
+          style="
+            color:var(--muted);
+            font-size:9px;
+            line-height:1.8
+          "
+        >
+          ${t(
+            "البوابة الرئيسية · تفتيش دوري · وردية صباحية",
+            "Main Gate · Routine Inspection · Morning Shift"
+          )}
+        </p>
+
+        <div class="visitMeta">
+
+          <span class="metaPill">
+            ${icon("clock-3")}
+            10:30
+          </span>
+
+          <span class="metaPill">
+            ${icon("blocks")}
+            Form v2.4
+          </span>
+
+          <span class="metaPill">
+            ${icon("user-round")}
             ${t(
-              'التصنيف والخطورة يحددان الإشعار والمهلة والتصعيد والخصم المقترح',
-              'Type and severity drive notification deadline escalation and proposed deduction'
+              "خالد السالم",
+              "Khaled Al Salem"
             )}
-          </p>
+          </span>
+
         </div>
 
-        ${B(
-          t(
-            'مثال تفاعلي',
-            'Interactive example'
-          ),
-          'warning'
-        )}
       </div>
 
-      <div class="formGrid">
-        <div class="field">
-          <label>
-            ${t(
-              'نوع المعالجة',
-              'Treatment type'
-            )}
-          </label>
+      <div class="progressCard">
 
-          <select
-            class="select"
-            onchange="
-              S.findingType=this.value;
-              render()
-            "
-          >
-            <option
-              value="immediate"
-              ${
-                S.findingType === 'immediate'
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${t(
-                'حالة فورية',
-                'Immediate case'
-              )}
-            </option>
+        <div class="progressRing">
 
-            <option
-              value="timed"
-              ${
-                S.findingType === 'timed'
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${t(
-                'معالجة خلال مدة محددة',
-                'Time-bound case'
-              )}
-            </option>
+          <div>
+            <b>
+              74%
+            </b>
 
-            <option
-              value="long_term"
-              ${
-                S.findingType === 'long_term'
-                  ? 'selected'
-                  : ''
-              }
-            >
+            <span>
               ${t(
-                'تحسين طويل المدى',
-                'Long-term improvement'
+                "اكتمل من النموذج",
+                "form completed"
               )}
-            </option>
-          </select>
+            </span>
+          </div>
+
         </div>
 
-        <div class="field">
-          <label>
-            ${t(
-              'درجة الخطورة',
-              'Severity'
-            )}
-          </label>
+        <div
+          class="permissionNotice"
+          style="margin-top:14px"
+        >
 
-          <select
-            class="select"
-            onchange="
-              S.findingSeverity=this.value;
-              render()
-            "
-          >
-            <option
-              value="low"
-              ${
-                S.findingSeverity === 'low'
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${t(
-                'منخفضة',
-                'Low'
-              )}
-            </option>
-
-            <option
-              value="medium"
-              ${
-                S.findingSeverity === 'medium'
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${t(
-                'متوسطة',
-                'Medium'
-              )}
-            </option>
-
-            <option
-              value="high"
-              ${
-                S.findingSeverity === 'high'
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${t(
-                'عالية',
-                'High'
-              )}
-            </option>
-
-            <option
-              value="critical"
-              ${
-                S.findingSeverity === 'critical'
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${t(
-                'حرجة',
-                'Critical'
-              )}
-            </option>
-          </select>
-        </div>
-      </div>
-
-      <div class="findingOutcome">
-        ${I(
-          S.findingSeverity === 'critical'
-            ? 'siren'
-            : 'clock-3'
-        )}
-
-        <div>
-          <b>
-            ${
-              S.findingSeverity === 'critical'
-                ? t(
-                    'إشعار فوري لإدارة المشروع',
-                    'Immediate Project Management alert'
-                  )
-                : t(
-                    'تدخل في مسار المعالجة المحدد',
-                    'Follows configured treatment flow'
-                  )
-            }
-          </b>
+          ${icon("eye-off")}
 
           <span>
             ${t(
-              'التصعيد بعد 3 ثم 6 ثم 9 أيام يظهر في شاشة الإجراءات والتصعيد',
-              '3 6 and 9 day escalation appears in Actions and Escalation'
+              "النسبة النهائية للمشروع غير معروضة للمفتش",
+              "Final project score is hidden from the inspector"
             )}
           </span>
+
         </div>
 
-        <button
-          class="
-            btn
-            ${
-              S.findingSeverity === 'critical'
-                ? 'dangerBtn'
-                : 'secondary'
-            }
-          "
-          onclick="registerFinding()"
-        >
-          ${t(
-            'تسجيل الملاحظة',
-            'Register finding'
-          )}
-        </button>
       </div>
+
     </div>
-  `;
-}
 
-function registerFinding() {
-  if (
-    S.findingSeverity === 'critical'
-  ) {
-    toast(
-      t(
-        'تم تسجيل الحالة الحرجة ومحاكاة إشعار فوري لإدارة المشروع',
-        'Critical finding registered and immediate Project Management alert simulated'
-      )
-    );
+    <section class="section">
 
-    return;
-  }
+      <div class="formSection">
 
-  toast(
-    t(
-      'تم تسجيل الملاحظة وربطها بمسار المعالجة',
-      'Finding registered and linked to its treatment workflow'
-    )
-  );
-}
+        <div class="sectionHead">
 
-function inspection() {
-  if (
-    S.role === 'project_manager'
-  ) {
-    return `
-      <div class="view">
+          <div>
+            <h2>
+              ${t(
+                "المحور الأول",
+                "Section One"
+              )}
+            </h2>
+
+            <p>
+              ${t(
+                "الانضباط والإجراءات",
+                "Discipline & Procedures"
+              )}
+            </p>
+          </div>
+
+          ${badge(
+            t(
+              "4 بنود",
+              "4 items"
+            ),
+            "info"
+          )}
+
+        </div>
+
+        ${inspectionQuestion(
+          "a",
+          t(
+            "سلامة بوابات الدخول",
+            "Entrance gate safety"
+          ),
+          t(
+            "التأكد من الإغلاق وعمل أنظمة التحكم",
+            "Verify gate security and access control"
+          ),
+          10
+        )}
+
+        ${inspectionQuestion(
+          "b",
+          t(
+            "اكتمال سجل الزوار",
+            "Visitor log completeness"
+          ),
+          t(
+            "تسجيل جميع الزوار والتحقق من الهوية",
+            "Record all visitors and verify identity"
+          ),
+          20
+        )}
+
+        ${inspectionQuestion(
+          "c",
+          t(
+            "جاهزية جهاز التفتيش",
+            "Inspection device readiness"
+          ),
+          t(
+            "حالة الجهاز قبل بداية الوردية",
+            "Verify device readiness before shift"
+          ),
+          30
+        )}
+
+        ${inspectionQuestion(
+          "d",
+          t(
+            "وضوح مخارج الطوارئ",
+            "Emergency exit visibility"
+          ),
+          t(
+            "عدم وجود عوائق وسلامة الإشارات",
+            "No obstruction and signage is visible"
+          ),
+          40
+        )}
+
+      </div>
+
+      ${
+        Object.values(
+          state.answers
+        ).includes("fail")
+          ? findingBuilder()
+          : ""
+      }
+
+      <div class="grid2">
+
         <div class="card">
+
           <div class="cardHead">
             <div>
-              <h3 class="cardTitle">
+              <h3>
                 ${t(
-                  'تقارير المشروع',
-                  'Project reports'
+                  "الأدلة",
+                  "Evidence"
                 )}
               </h3>
 
-              <p class="sub">
+              <p>
                 ${t(
-                  'مدير المشروع لا يعبئ التفتيش',
-                  'Project manager has no inspection-entry permission'
+                  "صورة أو فيديو أو مستند مرتبط بالبند",
+                  "Image video or document linked to the item"
                 )}
               </p>
             </div>
           </div>
 
-          ${visitRows()}
-        </div>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="view">
-      ${toolbar(
-        'التفتيش الميداني',
-        'Field Inspection',
-        `VIS-2026-000123 · ${projectName('P-001')} · نموذج التفتيش الدوري v2.4`,
-        `VIS-2026-000123 · ${projectName('P-001')} · Routine inspection form v2.4`,
-        B(
-          S.status === 'draft'
-            ? t(
-                'مسودة',
-                'Draft'
-              )
-            : t(
-                'بانتظار المراجعة',
-                'Pending review'
-              ),
-          S.status === 'draft'
-            ? 'warning'
-            : 'info'
-        )
-      )}
-
-      <div class="inspect">
-        <div class="card">
-          <div class="step done">
-            <div class="stepN">
-              1
-            </div>
-
-            <div>
-              <b>
-                ${t(
-                  'بيانات الزيارة',
-                  'Visit details'
-                )}
-              </b>
-
-              <span>
-                ${t(
-                  'المشروع والموقع والوردية',
-                  'Project site and shift'
-                )}
-              </span>
-            </div>
-          </div>
-
-          <div class="step active">
-            <div class="stepN">
-              2
-            </div>
-
-            <div>
-              <b>
-                ${t(
-                  'بنود التفتيش',
-                  'Inspection items'
-                )}
-              </b>
-
-              <span>
-                ${t(
-                  'الأوزان والإجابات',
-                  'Weights and answers'
-                )}
-              </span>
-            </div>
-          </div>
-
-          <div class="step">
-            <div class="stepN">
-              3
-            </div>
-
-            <div>
-              <b>
-                ${t(
-                  'الحراس الحاضرون',
-                  'Guards present'
-                )}
-              </b>
-
-              <span>
-                ${t(
-                  'تقييم مستقل لكل حارس',
-                  'Separate guard evaluation'
-                )}
-              </span>
-            </div>
-          </div>
-
-          <div class="step">
-            <div class="stepN">
-              4
-            </div>
-
-            <div>
-              <b>
-                ${t(
-                  'الأدلة والملاحظات',
-                  'Evidence and notes'
-                )}
-              </b>
-
-              <span>
-                ${t(
-                  'صور وفيديو ومستندات',
-                  'Images video and documents'
-                )}
-              </span>
-            </div>
-          </div>
-
-          <div class="step">
-            <div class="stepN">
-              5
-            </div>
-
-            <div>
-              <b>
-                ${t(
-                  'المراجعة والإرسال',
-                  'Review and submit'
-                )}
-              </b>
-
-              <span>
-                ${t(
-                  'تثبيت الإصدار والنتيجة',
-                  'Freeze version and score'
-                )}
-              </span>
-            </div>
-          </div>
-
-          ${
-            S.role === 'inspector'
-              ? `
-                <div class="scoreHidden">
-                  ${I('eye-off')}
-
-                  <b>
-                    ${t(
-                      'النتيجة غير ظاهرة للمفتش',
-                      'Score hidden from inspector'
-                    )}
-                  </b>
-
-                  <span>
-                    ${t(
-                      'تُحسب وتحفظ للنظام عند الإرسال دون منح المفتش صلاحية النتائج والتحليلات',
-                      'Calculated and stored on submit without granting results or analytics access'
-                    )}
-                  </span>
-                </div>
-              `
-              : scoreRing()
-          }
-        </div>
-
-        <div>
-          <div class="card">
-            <div class="cardHead">
-              <div>
-                <h3 class="cardTitle">
-                  ${t(
-                    'المحور 1 — الانضباط والإجراءات',
-                    'Section 1 — Discipline & Procedures'
-                  )}
-                </h3>
-
-                <p class="sub">
-                  ${t(
-                    'لا ينطبق يستبعد من البسط والمقام',
-                    'N/A is excluded from numerator and denominator'
-                  )}
-                </p>
-              </div>
-
-              ${B(
-                t(
-                  '4 بنود',
-                  '4 items'
-                ),
-                'info'
-              )}
-            </div>
-
-            ${question(
-              'a',
-              'سلامة بوابات الدخول',
-              'Entrance gate safety',
-              'التأكد من إغلاق البوابات وتشغيل أنظمة التحكم',
-              'Verify gates are secured and access control works',
-              10
-            )}
-
-            ${question(
-              'b',
-              'اكتمال سجل الزوار',
-              'Visitor log completeness',
-              'تسجيل جميع الزوار والتحقق من الهوية',
-              'All visitors are recorded and identities checked',
-              20
-            )}
-
-            ${question(
-              'c',
-              'جاهزية جهاز التفتيش',
-              'Inspection device readiness',
-              'حالة الجهاز ومعايرته قبل بداية الوردية',
-              'Device condition and calibration before shift',
-              30
-            )}
-
-            ${question(
-              'd',
-              'وضوح مخارج الطوارئ',
-              'Emergency exit visibility',
-              'عدم وجود عوائق وسلامة الإضاءة الإرشادية',
-              'No obstruction and signage lighting works',
-              40
-            )}
-          </div>
-
-          <div
-            class="grid2"
-            style="margin-top:14px"
+          <label
+            style="
+              min-height:130px;
+              display:grid;
+              place-items:center;
+              text-align:center;
+              border:
+                1px dashed
+                rgba(114,185,214,.24);
+              border-radius:17px;
+              color:var(--muted);
+              cursor:pointer
+            "
           >
-            <div class="card">
-              <div class="cardHead">
-                <div>
-                  <h3 class="cardTitle">
-                    ${t(
-                      'الأدلة والمرفقات',
-                      'Evidence & attachments'
-                    )}
-                  </h3>
 
-                  <p class="sub">
-                    ${t(
-                      'مرتبطة بالبند والمخالفة والزيارة والمشروع',
-                      'Linked to item finding visit and project'
-                    )}
-                  </p>
-                </div>
-              </div>
+            <div>
+              ${icon("cloud-upload")}
 
-              <label
-                class="drop"
-                for="fileInput"
+              <b
+                style="
+                  display:block;
+                  color:#dce8ed;
+                  font-size:9px;
+                  margin-top:6px
+                "
               >
-                ${I('cloud-upload')}
+                ${t(
+                  "رفع دليل",
+                  "Upload evidence"
+                )}
+              </b>
 
-                <b>
-                  ${t(
-                    'التقاط أو رفع صورة أو فيديو أو مستند',
-                    'Capture or upload image video or document'
-                  )}
-                </b>
-
-                <span>
-                  JPG · PNG · WebP · HEIC · MP4 · MOV · PDF · DOCX · XLSX
-                </span>
-
-                <input
-                  id="fileInput"
-                  hidden
-                  type="file"
-                  multiple
-                  accept="image/*,video/*,.pdf,.docx,.xlsx"
-                  onchange="fileDemo(this)"
-                >
-              </label>
-
-              <div
-                id="fileList"
-                class="list"
-                style="margin-top:9px"
-              ></div>
+              <span
+                style="
+                  display:block;
+                  font-size:7px;
+                  margin-top:3px
+                "
+              >
+                JPG · PNG · MP4 · MOV · PDF
+              </span>
             </div>
 
-            <div class="card">
-              <div class="cardHead">
-                <div>
-                  <h3 class="cardTitle">
-                    ${t(
-                      'الحراس الحاضرون',
-                      'Guards present'
-                    )}
-                  </h3>
+            <input
+              type="file"
+              hidden
+              onchange="
+                toast(
+                  t(
+                    'تمت إضافة المرفق إلى الديمو',
+                    'Attachment added to demo'
+                  )
+                )
+              "
+            >
 
-                  <p class="sub">
-                    ${t(
-                      'تقييم مستقل بجانب تقييم الموقع',
-                      'Separate guard evaluation alongside site inspection'
-                    )}
-                  </p>
-                </div>
+          </label>
 
+        </div>
+
+        <div class="card">
+
+          <div class="cardHead">
+            <div>
+              <h3>
+                ${t(
+                  "الحراس الموجودون",
+                  "Guards present"
+                )}
+              </h3>
+
+              <p>
+                ${t(
+                  "تقييم مستقل عن تقييم الموقع",
+                  "Separate from site evaluation"
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div class="list">
+
+            ${listItem(
+              "shield",
+              t(
+                "محمد العتيبي",
+                "Mohammed Al Otaibi"
+              ),
+              "EMP-1042",
+              `
                 <button
-                  class="btn"
-                  onclick="guardEval()"
+                  class="button"
+                  onclick="guardEvaluationModal()"
                 >
-                  ${I('user-round-check')}
-
                   ${t(
-                    'تقييم',
-                    'Evaluate'
+                    "تقييم",
+                    "Evaluate"
                   )}
                 </button>
-              </div>
+              `
+            )}
 
-              ${listItem(
-                'shield',
-                t(
-                  'محمد العتيبي',
-                  'Mohammed Al Otaibi'
-                ),
-                `EMP-1042 · ${t(
-                  'بوابة رئيسية',
-                  'Main gate'
-                )}`,
-                B(
-                  '92%',
-                  'success'
-                )
-              )}
+            ${listItem(
+              "shield",
+              t(
+                "سعد القحطاني",
+                "Saad Al Qahtani"
+              ),
+              "EMP-1088",
+              `
+                <button
+                  class="button"
+                  onclick="guardEvaluationModal()"
+                >
+                  ${t(
+                    "تقييم",
+                    "Evaluate"
+                  )}
+                </button>
+              `
+            )}
 
-              ${listItem(
-                'shield',
-                t(
-                  'سعد القحطاني',
-                  'Saad Al Qahtani'
-                ),
-                `EMP-1088 · ${t(
-                  'دورية داخلية',
-                  'Internal patrol'
-                )}`,
-                B(
-                  '86%',
-                  'info'
-                )
-              )}
-            </div>
           </div>
 
-          ${
-            Object
-              .values(S.answers)
-              .includes('fail')
-              ? findingClassificationPanel()
-              : ''
-          }
-
-          <div
-            style="
-              display:flex;
-              gap:8px;
-              justify-content:flex-end;
-              margin-top:14px;
-              flex-wrap:wrap
-            "
-          >
-            <button
-              class="btn"
-              onclick="saveDraft()"
-            >
-              ${I('save')}
-
-              ${t(
-                'حفظ مسودة',
-                'Save draft'
-              )}
-            </button>
-
-            <button
-              class="btn primary"
-              onclick="submitInspection()"
-            >
-              ${I('send')}
-
-              ${t(
-                'إرسال للمراجعة',
-                'Submit for review'
-              )}
-            </button>
-          </div>
         </div>
+
       </div>
-    </div>
-  `;
-}
 
-function review() {
-  const labels = {
-    pending: t(
-      'بانتظار المراجعة',
-      'Pending review'
-    ),
+      <div
+        class="heroActionRow"
+        style="
+          justify-content:flex-end;
+          margin-top:15px
+        "
+      >
 
-    returned: t(
-      'معاد للاستكمال',
-      'Returned for completion'
-    ),
-
-    approved: t(
-      'معتمد',
-      'Approved'
-    ),
-
-    rejected: t(
-      'مرفوض',
-      'Rejected'
-    )
-  };
-
-  const label =
-    labels[S.reviewState];
-
-  return `
-    <div class="view">
-      ${toolbar(
-        'المراجعة والاعتماد والرفض',
-        'Review Approval & Rejection',
-        'المراجعة منفصلة عن الاعتماد والإعادة والرفض يتطلبان سببًا',
-        'Review is separate from approval and return or rejection require a reason',
-        ''
-      )}
-
-      <div class="grid2">
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                REP-2026-000094
-              </h3>
-
-              <p class="sub">
-                ${projectName('P-001')}
-                ·
-                VIS-2026-000123
-                ·
-                v2.4
-              </p>
-            </div>
-
-            ${B(
-              label,
-              S.reviewState === 'approved'
-                ? 'success'
-                : S.reviewState === 'rejected'
-                  ? 'danger'
-                  : S.reviewState === 'returned'
-                    ? 'warning'
-                    : 'info'
-            )}
-          </div>
-
-          <div
-            class="kpis"
-            style="
-              grid-template-columns:
-                repeat(3,1fr)
-            "
-          >
-            <div class="kpi">
-              <b>
-                ${score()}%
-              </b>
-
-              <span>
-                ${t(
-                  'النتيجة',
-                  'Score'
-                )}
-              </span>
-            </div>
-
-            <div class="kpi">
-              <b>4</b>
-
-              <span>
-                ${t(
-                  'بنود',
-                  'Items'
-                )}
-              </span>
-            </div>
-
-            <div class="kpi">
-              <b>1</b>
-
-              <span>
-                ${t(
-                  'مخالفة',
-                  'Finding'
-                )}
-              </span>
-            </div>
-          </div>
-
-          <div
-            style="
-              display:flex;
-              gap:8px;
-              flex-wrap:wrap;
-              margin-top:12px
-            "
-          >
-            ${
-              S.role === 'quality_staff'
-                ? `
-                  <button
-                    class="btn secondary"
-                    onclick="decision('return')"
-                  >
-                    ${I('undo-2')}
-
-                    ${t(
-                      'إعادة للاستكمال',
-                      'Return'
-                    )}
-                  </button>
-                `
-                : ''
-            }
-
-            ${
-              S.role === 'quality_admin'
-                ? `
-                  <button
-                    class="btn secondary"
-                    onclick="decision('return')"
-                  >
-                    ${I('undo-2')}
-
-                    ${t(
-                      'إعادة للاستكمال',
-                      'Return'
-                    )}
-                  </button>
-
-                  <button
-                    class="btn dangerBtn"
-                    onclick="decision('reject')"
-                  >
-                    ${I('ban')}
-
-                    ${t(
-                      'رفض',
-                      'Reject'
-                    )}
-                  </button>
-
-                  <button
-                    class="btn primary"
-                    onclick="decision('approve')"
-                  >
-                    ${I('badge-check')}
-
-                    ${t(
-                      'اعتماد',
-                      'Approve'
-                    )}
-                  </button>
-                `
-                : ''
-            }
-
-            ${
-              S.role === 'owner'
-                ? B(
-                    t(
-                      'عرض فقط حسب القالب الحالي',
-                      'View only under current template'
-                    ),
-                    'neutral'
-                  )
-                : ''
-            }
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'سجل القرار التاريخي',
-                  'Decision snapshot history'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'الاسم والمسمى والتاريخ والوقت والسبب تظل ثابتة تاريخيًا',
-                  'Name title date time and reason remain historically frozen'
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div class="timeline">
-            <div class="tl">
-              <b>
-                ${t(
-                  'إرسال التفتيش',
-                  'Inspection submitted'
-                )}
-              </b>
-
-              <p>
-                ${t(
-                  'خالد السالم · مفتش جودة · 04 أكتوبر 10:31',
-                  'Khaled Al Salem · Quality Inspector · 04 Oct 10:31'
-                )}
-              </p>
-            </div>
-
-            <div class="tl">
-              <b>
-                ${t(
-                  'بدأت المراجعة',
-                  'Review started'
-                )}
-              </b>
-
-              <p>
-                ${t(
-                  'سارة محمد · موظف جودة · 04 أكتوبر 10:40',
-                  'Sarah Mohammed · Quality Officer · 04 Oct 10:40'
-                )}
-              </p>
-            </div>
-
-            <div class="tl">
-              <b>
-                ${t(
-                  'آخر قرار',
-                  'Latest decision'
-                )}
-              </b>
-
-              <p id="decisionHistory">
-                ${t(
-                  'لا يوجد قرار نهائي بعد',
-                  'No final decision yet'
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function forms() {
-  return `
-    <div class="view">
-      ${toolbar(
-        'النماذج والإصدارات',
-        'Forms & Versions',
-        'النموذج المنشور مقفل وأي تغيير ينشئ إصدارًا جديدًا للمراجعة',
-        'Published forms are immutable and any change creates a new reviewable version',
-        `
-          <button
-            class="btn primary"
-            onclick="formBuilder()"
-          >
-            ${I('plus')}
-
-            ${t(
-              'نموذج جديد',
-              'New form'
-            )}
-          </button>
-        `
-      )}
-
-      <div class="grid2">
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'نموذج التفتيش الدوري',
-                  'Routine Inspection Form'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  '42 بندًا · مرتبط بالمشروع ونوع التفتيش',
-                  '42 items · scoped by project and inspection type'
-                )}
-              </p>
-            </div>
-
-            ${B(
+        <button
+          class="button"
+          onclick="
+            toast(
               t(
-                'منشور',
-                'Published'
-              ),
-              'success'
-            )}
-          </div>
-
-          <div class="version">
-            <div class="vno">
-              v2.4
-            </div>
-
-            <div class="vmain">
-              <b>
-                ${t(
-                  'الإصدار الحالي',
-                  'Current version'
-                )}
-              </b>
-
-              <span>
-                ${t(
-                  'منشور ومقفل · 01 أكتوبر 2026',
-                  'Published & locked · 01 Oct 2026'
-                )}
-              </span>
-            </div>
-
-            ${B(
-              t(
-                'نشط',
-                'Active'
-              ),
-              'success'
-            )}
-          </div>
-
-          <div class="version">
-            <div class="vno">
-              v2.3
-            </div>
-
-            <div class="vmain">
-              <b>
-                ${t(
-                  'الإصدار السابق',
-                  'Previous version'
-                )}
-              </b>
-
-              <span>
-                ${t(
-                  'استخدم في 28 زيارة ولا يتغير',
-                  'Used in 28 visits and remains immutable'
-                )}
-              </span>
-            </div>
-
-            ${B(
-              t(
-                'مؤرشف',
-                'Archived'
-              ),
-              'neutral'
-            )}
-          </div>
-
-          <button
-            class="btn secondary"
-            onclick="
-              toast(
-                t(
-                  'تم إنشاء v2.5 كمسودة دون تغيير v2.4',
-                  'Created v2.5 as draft without changing v2.4'
-                )
+                'تم حفظ المسودة',
+                'Draft saved'
               )
-            "
-          >
-            ${I('git-branch')}
-
-            ${t(
-              'إنشاء إصدار جديد',
-              'Create new version'
-            )}
-          </button>
-        </div>
-
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'اختبار ثبات النتائج السابقة',
-                  'Historical result integrity test'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'الزيارة القديمة تحتفظ بالنص والوزن والنتيجة بعد نشر إصدار جديد',
-                  'Old visits keep item text weights and score after publishing a new version'
-                )}
-              </p>
-            </div>
-          </div>
-
-          ${listItem(
-            'file-check-2',
-            'REP-2026-000089 · v2.3',
-            t(
-              'الوزن التاريخي محفوظ · النتيجة 88%',
-              'Historical weights frozen · score 88%'
-            ),
-            B(
-              t(
-                'ثابت',
-                'Frozen'
-              ),
-              'success'
             )
+          "
+        >
+          ${icon("save")}
+          ${t(
+            "حفظ مسودة",
+            "Save Draft"
           )}
+        </button>
 
-          ${listItem(
-            'file-check-2',
-            'REP-2026-000094 · v2.4',
-            t(
-              'الإصدار الحالي · النتيجة 92%',
-              'Current version · score 92%'
-            ),
-            B(
-              t(
-                'ثابت',
-                'Frozen'
-              ),
-              'success'
-            )
+        <button
+          class="button primary"
+          onclick="submitInspection()"
+        >
+          ${icon("send")}
+          ${t(
+            "إرسال للمراجعة",
+            "Submit for Review"
           )}
+        </button>
 
-          <div
-            class="sensitive"
-            style="margin-top:12px"
-          >
-            ${I('lock')}
-
-            <div>
-              <b>
-                ${t(
-                  'قاعدة تاريخية',
-                  'Historical rule'
-                )}
-              </b>
-
-              <p>
-                ${t(
-                  'كل إجابة تحفظ نص البند والوزن وإصدار النموذج وقت الزيارة والنتيجة النهائية عند الإرسال',
-                  'Each answer stores item text weight form version and final submitted score'
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
-    </div>
+
+    </section>
   `;
 }
 
-function guards() {
-  let rows = [
-    [
-      'محمد العتيبي',
-      'Mohammed Al Otaibi',
-      'EMP-1042',
-      '***6789',
-      'P-001',
-      '92%',
-      '1'
-    ],
-
-    [
-      'سعد القحطاني',
-      'Saad Al Qahtani',
-      'EMP-1088',
-      '***1312',
-      'P-001',
-      '86%',
-      '0'
-    ],
-
-    [
-      'ناصر الحربي',
-      'Nasser Al Harbi',
-      'EMP-2043',
-      '***4401',
-      'P-002',
-      '79%',
-      '3'
-    ]
-  ];
-
-  if (
-    [
-      'project_manager',
-      'guard_supervisor'
-    ].includes(S.role)
-  ) {
-    rows = rows.filter(
-      row => row[4] === 'P-001'
-    );
-  }
-
+function findingBuilder() {
   return `
-    <div class="view">
-      ${toolbar(
-        'سجل الحراس والتقييم',
-        'Guard Records & Evaluation',
-        'التقييمات والملاحظات المتكررة والإجراءات والتدريب مرتبطة بسجل الموظف',
-        'Evaluations repeated findings actions and training are linked to employee history',
-        [
-          'owner',
-          'quality_admin'
-        ].includes(S.role)
-          ? `
-            <button class="btn">
-              ${I('file-up')}
+    <div class="findingBuilder">
 
-              ${t(
-                'استيراد Excel',
-                'Import Excel'
-              )}
-            </button>
-          `
-          : ''
-      )}
-
-      <div class="card">
-        <div class="table">
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  ${t(
-                    'الحارس',
-                    'Guard'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'الرقم الوظيفي',
-                    'Employee no.'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'الهوية',
-                    'ID'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'المشروع',
-                    'Project'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'آخر تقييم',
-                    'Last evaluation'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'تكرار الملاحظة',
-                    'Repeated findings'
-                  )}
-                </th>
-
-                <th></th>
-              </tr>
-            </thead>
-
-            <tbody>
-              ${rows
-                .map(row => {
-                  return `
-                    <tr>
-                      <td>
-                        <b>
-                          ${t(
-                            row[0],
-                            row[1]
-                          )}
-                        </b>
-                      </td>
-
-                      <td>
-                        ${row[2]}
-                      </td>
-
-                      <td>
-                        ${row[3]}
-                      </td>
-
-                      <td>
-                        ${projectName(
-                          row[4]
-                        )}
-                      </td>
-
-                      <td>
-                        ${B(
-                          row[5],
-                          parseInt(
-                            row[5]
-                          ) >= 85
-                            ? 'success'
-                            : 'warning'
-                        )}
-                      </td>
-
-                      <td>
-                        ${row[6]}
-                      </td>
-
-                      <td>
-                        <button
-                          class="btn"
-                          onclick="guardProfile('${t(
-                            row[0],
-                            row[1]
-                          )}')"
-                        >
-                          ${t(
-                            'فتح السجل',
-                            'Open record'
-                          )}
-                        </button>
-                      </td>
-                    </tr>
-                  `;
-                })
-                .join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function actions() {
-  let rows = [
-    {
-      id: 'CAPA-2026-0041',
-      finding: t(
-        'بوابة الطوارئ',
-        'Emergency gate'
-      ),
-      project: 'P-001',
-      severity: t(
-        'حرجة',
-        'Critical'
-      ),
-      kind: t(
-        'حالة فورية',
-        'Immediate'
-      ),
-      age: 10,
-      status: t(
-        'متأخر',
-        'Overdue'
-      )
-    },
-
-    {
-      id: 'CAPA-2026-0044',
-      finding: t(
-        'سجل الزوار',
-        'Visitor log'
-      ),
-      project: 'P-002',
-      severity: t(
-        'متوسطة',
-        'Medium'
-      ),
-      kind: t(
-        'معالجة خلال مدة',
-        'Time-bound'
-      ),
-      age: 4,
-      status: t(
-        'قيد المعالجة',
-        'In progress'
-      )
-    },
-
-    {
-      id: 'CAPA-2026-0038',
-      finding: t(
-        'مخرج الطوارئ',
-        'Emergency exit'
-      ),
-      project: 'P-001',
-      severity: t(
-        'عالية',
-        'High'
-      ),
-      kind: t(
-        'تحسين طويل المدى',
-        'Long-term'
-      ),
-      age: 7,
-      status: t(
-        'بانتظار المراجعة',
-        'Pending review'
-      )
-    }
-  ];
-
-  if (
-    S.role === 'project_manager'
-  ) {
-    rows = rows.filter(
-      row => row.project === 'P-001'
-    );
-  }
-
-  return `
-    <div class="view">
-      ${toolbar(
-        'الملاحظات والإجراءات والتصعيد',
-        'Findings Corrective Actions & Escalation',
-        'تصنيف الملاحظات مع تصعيد 3 ثم 6 ثم 9 أيام ثم الإدارة العليا وبريد في كل مرحلة',
-        'Finding classification with 3 6 9 day escalation then Senior Management and email at each stage',
-        S.role === 'quality_admin'
-          ? `
-            <button
-              class="btn primary"
-              onclick="escalationSettings()"
-            >
-              ${I('settings-2')}
-
-              ${t(
-                'إعداد سياسة التصعيد',
-                'Escalation policy'
-              )}
-            </button>
-          `
-          : ''
-      )}
-
-      <div class="grid3 escalationCards">
-        <div class="escalationCard yellow">
-          <div>
-            ${I('clock-3')}
-
-            <b>
-              ${t(
-                'بعد 3 أيام',
-                'After 3 days'
-              )}
-            </b>
-          </div>
-
-          <span>
-            ${t(
-              'أصفر + بريد للمسؤول وإدارة المشروع',
-              'Yellow + email to owner and Project Management'
-            )}
-          </span>
-        </div>
-
-        <div class="escalationCard orange">
-          <div>
-            ${I('clock-alert')}
-
-            <b>
-              ${t(
-                'بعد 6 أيام',
-                'After 6 days'
-              )}
-            </b>
-          </div>
-
-          <span>
-            ${t(
-              'برتقالي + بريد متابعة',
-              'Orange + follow-up email'
-            )}
-          </span>
-        </div>
-
-        <div class="escalationCard red">
-          <div>
-            ${I('siren')}
-
-            <b>
-              ${t(
-                'بعد 9 أيام',
-                'After 9 days'
-              )}
-            </b>
-          </div>
-
-          <span>
-            ${t(
-              'أحمر ثم تصعيد للإدارة العليا + بريد',
-              'Red then Senior Management escalation + email'
-            )}
-          </span>
-        </div>
-      </div>
-
-      <div class="policyBar">
-        ${I('calendar-clock')}
+      <div class="sectionHead">
 
         <div>
-          <b>
-            ${t(
-              'سياسة الاحتساب الحالية في الديمو',
-              'Current demo counting policy'
-            )}
-          </b>
-
-          <span>
-            ${t(
-              `البداية من ${
-                S.escalationStart ===
-                'finding_created'
-                  ? 'تسجيل الملاحظة'
-                  : 'تاريخ الاستحقاق'
-              } · ${
-                S.escalationBasis ===
-                'calendar'
-                  ? 'أيام تقويمية'
-                  : 'أيام عمل'
-              } · تثبت نهائيًا قبل التنفيذ`,
-              `Starts from ${
-                S.escalationStart ===
-                'finding_created'
-                  ? 'finding creation'
-                  : 'due date'
-              } · ${
-                S.escalationBasis ===
-                'calendar'
-                  ? 'calendar days'
-                  : 'business days'
-              } · finalized before implementation`
-            )}
-          </span>
-        </div>
-      </div>
-
-      <div class="stats">
-        ${stat(
-          'circle-dot',
-          'مفتوحة',
-          'Open',
-          '9',
-          t(
-            '3 جديدة',
-            '3 new'
-          )
-        )}
-
-        ${stat(
-          'clock-alert',
-          'متأخرة',
-          'Overdue',
-          '3',
-          t(
-            'تحتاج متابعة',
-            'Need follow-up'
-          ),
-          'red'
-        )}
-
-        ${stat(
-          'repeat-2',
-          'متكررة',
-          'Repeated',
-          '4',
-          t(
-            'خلال 30 يوم',
-            'In 30 days'
-          ),
-          'gold'
-        )}
-
-        ${stat(
-          'circle-check-big',
-          'مغلقة',
-          'Closed',
-          '27',
-          t(
-            '+6 هذا الشهر',
-            '+6 this month'
-          ),
-          'blue'
-        )}
-      </div>
-
-      <div class="card">
-        <div class="table">
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  ${t(
-                    'الرقم',
-                    'Reference'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'الملاحظة',
-                    'Finding'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'التصنيف',
-                    'Class'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'الخطورة',
-                    'Severity'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'العمر',
-                    'Age'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'التصعيد',
-                    'Escalation'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'الحالة',
-                    'Status'
-                  )}
-                </th>
-
-                <th></th>
-              </tr>
-            </thead>
-
-            <tbody>
-              ${rows
-                .map(row => {
-                  let escalation;
-
-                  if (row.age >= 9) {
-                    escalation = B(
-                      t(
-                        'أحمر · إدارة عليا',
-                        'Red · Senior Management'
-                      ),
-                      'danger'
-                    );
-                  } else if (
-                    row.age >= 6
-                  ) {
-                    escalation = `
-                      <span class="badge escalationOrange">
-                        ${t(
-                          'برتقالي',
-                          'Orange'
-                        )}
-                      </span>
-                    `;
-                  } else if (
-                    row.age >= 3
-                  ) {
-                    escalation = `
-                      <span class="badge escalationYellow">
-                        ${t(
-                          'أصفر',
-                          'Yellow'
-                        )}
-                      </span>
-                    `;
-                  } else {
-                    escalation = B(
-                      t(
-                        'طبيعي',
-                        'Normal'
-                      ),
-                      'success'
-                    );
-                  }
-
-                  return `
-                    <tr>
-                      <td>
-                        ${row.id}
-                      </td>
-
-                      <td>
-                        ${row.finding}
-
-                        <small class="tableSub">
-                          ${projectName(
-                            row.project
-                          )}
-                        </small>
-                      </td>
-
-                      <td>
-                        ${row.kind}
-                      </td>
-
-                      <td>
-                        ${B(
-                          row.severity,
-                          row.severity ===
-                            t(
-                              'حرجة',
-                              'Critical'
-                            )
-                            ? 'danger'
-                            : row.severity ===
-                              t(
-                                'عالية',
-                                'High'
-                              )
-                              ? 'warning'
-                              : 'info'
-                        )}
-                      </td>
-
-                      <td>
-                        ${row.age}
-                        ${t(
-                          'يوم',
-                          'days'
-                        )}
-                      </td>
-
-                      <td>
-                        ${escalation}
-                      </td>
-
-                      <td>
-                        ${B(
-                          row.status,
-                          row.status ===
-                            t(
-                              'متأخر',
-                              'Overdue'
-                            )
-                            ? 'danger'
-                            : 'warning'
-                        )}
-                      </td>
-
-                      <td>
-                        <button
-                          class="btn"
-                          onclick="actionModal('${row.id}')"
-                        >
-                          ${t(
-                            'التفاصيل',
-                            'Details'
-                          )}
-                        </button>
-                      </td>
-                    </tr>
-                  `;
-                })
-                .join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function training() {
-  return `
-    <div class="view">
-      ${toolbar(
-        'طلبات الدورات التدريبية',
-        'Training Requests',
-        'المسار هو مشرف الحراس ثم مدير المشروع ثم إدارة الجودة ثم إثبات الإتمام',
-        'Flow is Guard Supervisor then Project Manager then Quality Management then completion evidence',
-        S.role === 'guard_supervisor'
-          ? `
-            <button
-              class="btn primary"
-              onclick="trainingModal()"
-            >
-              ${I('plus')}
-
-              ${t(
-                'طلب دورة',
-                'Request training'
-              )}
-            </button>
-          `
-          : ''
-      )}
-
-      <div class="card">
-        <div class="timeline">
-          <div class="tl">
-            <b>
-              TRN-2026-0018
-              ·
-              ${t(
-                'إدارة الحشود',
-                'Crowd Management'
-              )}
-            </b>
-
-            <p>
-              ${t(
-                'رفع بواسطة مشرف الحراس · محمد العتيبي · مرتبط بتقييم 81%',
-                'Raised by Guard Supervisor · Mohammed Al Otaibi · linked to 81% evaluation'
-              )}
-            </p>
-
-            ${B(
-              t(
-                'بانتظار مدير المشروع',
-                'Pending Project Manager'
-              ),
-              'warning'
-            )}
-          </div>
-
-          <div class="tl">
-            <b>
-              TRN-2026-0015
-              ·
-              ${t(
-                'الاستجابة للطوارئ',
-                'Emergency Response'
-              )}
-            </b>
-
-            <p>
-              ${t(
-                'وافق مدير المشروع · انتقل تلقائيًا لإدارة الجودة',
-                'Project Manager approved · automatically escalated to Quality Management'
-              )}
-            </p>
-
-            ${B(
-              t(
-                'عند إدارة الجودة',
-                'At Quality Management'
-              ),
-              'info'
-            )}
-          </div>
-
-          <div class="tl">
-            <b>
-              TRN-2026-0009
-              ·
-              ${t(
-                'التعامل مع الزوار',
-                'Visitor Handling'
-              )}
-            </b>
-
-            <p>
-              ${t(
-                'اكتمل التدريب وتم رفع الشهادة وربطها بسجل الموظف',
-                'Training completed and certificate linked to employee record'
-              )}
-            </p>
-
-            ${B(
-              t(
-                'مكتمل',
-                'Completed'
-              ),
-              'success'
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function confidential() {
-  if (S.role === 'guard') {
-    return `
-      <div class="view">
-        <section class="hero">
-          <div class="kicker">
-            ${I('lock-keyhole')}
-
-            ${t(
-              'قناة خاصة',
-              'Private channel'
-            )}
-          </div>
-
           <h2>
             ${t(
-              'استبيان أو شكوى أو بلاغ حساس',
-              'Survey complaint or sensitive report'
+              "إنشاء ملاحظة من البند غير المطابق",
+              "Create Finding from Non-compliant Item"
             )}
           </h2>
 
           <p>
             ${t(
-              'لا يظهر المحتوى في البحث العام أو تقارير المشاريع ولا يطلع عليه إلا الأشخاص الذين يحددهم مالك النظام',
-              'Content is excluded from general search and project reports and only owner-authorized people can access it'
-            )}
-          </p>
-        </section>
-
-        <div
-          class="grid2"
-          style="margin-top:14px"
-        >
-          <div class="card">
-            <div class="formGrid">
-              <div class="field">
-                <label>
-                  ${t(
-                    'النوع',
-                    'Type'
-                  )}
-                </label>
-
-                <select class="select">
-                  <option>
-                    ${t(
-                      'بلاغ حساس',
-                      'Sensitive report'
-                    )}
-                  </option>
-
-                  <option>
-                    ${t(
-                      'شكوى',
-                      'Complaint'
-                    )}
-                  </option>
-
-                  <option>
-                    ${t(
-                      'استبيان',
-                      'Survey'
-                    )}
-                  </option>
-                </select>
-              </div>
-
-              <div class="field">
-                <label>
-                  ${t(
-                    'الموضوع',
-                    'Subject'
-                  )}
-                </label>
-
-                <input
-                  class="input"
-                  placeholder="${t(
-                    'عنوان مختصر',
-                    'Short subject'
-                  )}"
-                >
-              </div>
-
-              <div class="field span2">
-                <label>
-                  ${t(
-                    'التفاصيل',
-                    'Details'
-                  )}
-                </label>
-
-                <textarea
-                  class="textarea"
-                ></textarea>
-              </div>
-
-              <div class="span2">
-                <button
-                  class="btn primary"
-                  onclick="
-                    toast(
-                      t(
-                        'تم إرسال البلاغ إلى القناة الخاصة',
-                        'Report sent to private channel'
-                      )
-                    )
-                  "
-                >
-                  ${I('shield-check')}
-
-                  ${t(
-                    'إرسال بأمان',
-                    'Send securely'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="cardHead">
-              <div>
-                <h3 class="cardTitle">
-                  ${t(
-                    'بلاغاتي فقط',
-                    'My reports only'
-                  )}
-                </h3>
-
-                <p class="sub">
-                  ${t(
-                    'الحارس لا يرى بلاغات الآخرين',
-                    'Guard cannot see other users reports'
-                  )}
-                </p>
-              </div>
-            </div>
-
-            ${listItem(
-              'lock',
-              'SEC-2026-0012',
-              t(
-                'يوجد رد جديد بدون كشف المحتوى في الإشعار',
-                'New reply without exposing content in notification'
-              ),
-              B(
-                t(
-                  'قيد المتابعة',
-                  'In progress'
-                ),
-                'info'
-              )
-            )}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  const granted =
-    S.sensitiveGranted.filter(
-      role => role !== 'owner'
-    );
-
-  return `
-    <div class="view">
-      ${toolbar(
-        'البلاغات الحساسة',
-        'Sensitive Reports',
-        'صلاحية مستقلة عن المسمى الوظيفي ولا يمنحها أو يسحبها إلا مالك النظام',
-        'Independent from job role and only System Owner may grant or revoke access',
-        ''
-      )}
-
-      <div class="sensitive">
-        ${I('shield-alert')}
-
-        <div>
-          <b>
-            ${t(
-              'لا توجد صلاحية تلقائية لأي دور إداري',
-              'No administrative role receives automatic access'
-            )}
-          </b>
-
-          <p>
-            ${t(
-              'إدارة الجودة ومدير المشروع والمشرف وموظف الجودة ومدير النظام لا يشاهدون البلاغات إلا إذا منحهم المالك تصريحًا مستقلًا',
-              'Quality Management Project Manager Supervisor Quality Officer and administrators cannot access sensitive reports unless independently authorized by the owner'
+              "التصنيف والخطورة يحددان المعالجة والتصعيد",
+              "Type and severity determine treatment and escalation"
             )}
           </p>
         </div>
-      </div>
 
-      <div
-        class="grid2"
-        style="margin-top:14px"
-      >
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'الأشخاص المخولون',
-                  'Authorized people'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'المالك فقط يستطيع التعديل',
-                  'Owner only can change access'
-                )}
-              </p>
-            </div>
-          </div>
-
-          ${listItem(
-            'user-lock',
-            t(
-              'سلطان ا',
-              'Sultan A.'
-            ),
-            t(
-              'مالك النظام · اطلاع ورد وإغلاق',
-              'System Owner · view reply close'
-            ),
-            B(
-              t(
-                'مخول',
-                'Authorized'
-              ),
-              'success'
-            )
-          )}
-
-          ${granted
-            .map(role => {
-              return listItem(
-                'user-lock',
-                t(
-                  ROLE_META[role].ar,
-                  ROLE_META[role].en
-                ),
-                t(
-                  'تصريح مستقل',
-                  'Independent permission'
-                ),
-                B(
-                  t(
-                    'مخول',
-                    'Authorized'
-                  ),
-                  'success'
-                )
-              );
-            })
-            .join('')}
-
-          ${
-            S.role === 'owner'
-              ? `
-                <div
-                  class="field"
-                  style="margin-top:12px"
-                >
-                  <label>
-                    ${t(
-                      'منح أو سحب تصريح مستقل',
-                      'Grant or revoke independent access'
-                    )}
-                  </label>
-
-                  <select
-                    id="grantRole"
-                    class="select"
-                  >
-                    <option value="quality_staff">
-                      ${t(
-                        'موظف الجودة',
-                        'Quality Officer'
-                      )}
-                    </option>
-
-                    <option value="project_manager">
-                      ${t(
-                        'مدير المشروع',
-                        'Project Manager'
-                      )}
-                    </option>
-
-                    <option value="inspector">
-                      ${t(
-                        'مفتش الجودة',
-                        'Quality Inspector'
-                      )}
-                    </option>
-
-                    <option value="guard_supervisor">
-                      ${t(
-                        'مشرف الحراس',
-                        'Guard Supervisor'
-                      )}
-                    </option>
-                  </select>
-                </div>
-
-                <div
-                  style="
-                    display:flex;
-                    gap:7px;
-                    margin-top:8px
-                  "
-                >
-                  <button
-                    class="btn primary"
-                    onclick="grantSensitive()"
-                  >
-                    ${t(
-                      'منح',
-                      'Grant'
-                    )}
-                  </button>
-
-                  <button
-                    class="btn dangerBtn"
-                    onclick="revokeSensitive()"
-                  >
-                    ${t(
-                      'سحب',
-                      'Revoke'
-                    )}
-                  </button>
-                </div>
-              `
-              : `
-                <div
-                  class="policyHint"
-                  style="margin-top:10px"
-                >
-                  ${I('lock')}
-
-                  ${t(
-                    'هذا الحساب لا يستطيع منح الصلاحية لنفسه أو لغيره',
-                    'This account cannot grant sensitive access to itself or others'
-                  )}
-                </div>
-              `
-          }
-        </div>
-
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'سجل الاطلاع المحمي',
-                  'Protected access log'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'كل فتح ورد وتغيير حالة موثق',
-                  'Every open reply and status change is logged'
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div class="timeline">
-            <div class="tl">
-              <b>
-                ${t(
-                  'عرض البلاغ SEC-2026-0012',
-                  'Opened SEC-2026-0012'
-                )}
-              </b>
-
-              <p>
-                ${t(
-                  'سلطان ا · 11:04 · IP محفوظ',
-                  'Sultan A. · 11:04 · IP stored'
-                )}
-              </p>
-            </div>
-
-            <div class="tl">
-              <b>
-                ${t(
-                  'إضافة رد داخلي',
-                  'Internal reply added'
-                )}
-              </b>
-
-              <p>
-                ${t(
-                  'محتوى البلاغ لا يظهر في الإشعار العام',
-                  'Sensitive content never appears in general notifications'
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function reports() {
-  let rows = [
-    {
-      id: 'REP-2026-000094',
-      project: 'P-001',
-      visit: 'VIS-2026-000123',
-      score: '92%',
-      status: 'approved',
-      own: true,
-      date: '04 Oct'
-    },
-
-    {
-      id: 'REP-2026-000091',
-      project: 'P-002',
-      visit: 'VIS-2026-000119',
-      score: '81%',
-      status: 'pending',
-      own: false,
-      date: '02 Oct'
-    },
-
-    {
-      id: 'REP-2026-000089',
-      project: 'P-001',
-      visit: 'VIS-2026-000115',
-      score: '88%',
-      status: 'returned',
-      own: true,
-      date: '30 Sep'
-    }
-  ];
-
-  if (
-    S.role === 'project_manager'
-  ) {
-    rows = rows.filter(
-      row => row.project === 'P-001'
-    );
-  }
-
-  if (S.role === 'inspector') {
-    rows = rows.filter(
-      row => row.own
-    );
-  }
-
-  const statusLabel = status => {
-    if (status === 'approved') {
-      return t(
-        'معتمد',
-        'Approved'
-      );
-    }
-
-    if (status === 'pending') {
-      return t(
-        'بانتظار المراجعة',
-        'Pending review'
-      );
-    }
-
-    return t(
-      'معاد للاستكمال',
-      'Returned'
-    );
-  };
-
-  return `
-    <div class="view">
-      ${toolbar(
-        'التقارير PDF وExcel',
-        'PDF & Excel Reports',
-        'بيانات صاحب القرار محفوظة تاريخيًا وتنزيل التقرير المعتمد يظهر حسب الصلاحية',
-        'Decision snapshot is preserved historically and approved PDF download is permission based',
-        S.role === 'inspector'
-          ? ''
-          : `
-            <button
-              class="btn"
-              onclick="csv()"
-            >
-              ${I('sheet')}
-
-              ${t(
-                'تصدير Excel / CSV',
-                'Export Excel / CSV'
-              )}
-            </button>
-          `
-      )}
-
-      <div class="card">
-        <div class="table">
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  ${t(
-                    'التقرير',
-                    'Report'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'المشروع',
-                    'Project'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'الزيارة',
-                    'Visit'
-                  )}
-                </th>
-
-                ${
-                  S.role === 'inspector'
-                    ? ''
-                    : `
-                      <th>
-                        ${t(
-                          'النتيجة',
-                          'Score'
-                        )}
-                      </th>
-                    `
-                }
-
-                <th>
-                  ${t(
-                    'الحالة',
-                    'Status'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'التاريخ',
-                    'Date'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'الإجراء',
-                    'Action'
-                  )}
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              ${rows
-                .map(row => {
-                  return `
-                    <tr>
-                      <td>
-                        <b>
-                          ${row.id}
-                        </b>
-                      </td>
-
-                      <td>
-                        ${projectName(
-                          row.project
-                        )}
-                      </td>
-
-                      <td>
-                        ${row.visit}
-                      </td>
-
-                      ${
-                        S.role === 'inspector'
-                          ? ''
-                          : `
-                            <td>
-                              ${row.score}
-                            </td>
-                          `
-                      }
-
-                      <td>
-                        ${B(
-                          statusLabel(
-                            row.status
-                          ),
-                          row.status === 'approved'
-                            ? 'success'
-                            : row.status === 'pending'
-                              ? 'info'
-                              : 'warning'
-                        )}
-                      </td>
-
-                      <td>
-                        ${row.date}
-                      </td>
-
-                      <td>
-                        <div class="rowActions">
-                          <button
-                            class="btn"
-                            onclick="reportModal('${row.id}','${row.status}')"
-                          >
-                            ${t(
-                              'فتح',
-                              'Open'
-                            )}
-                          </button>
-
-                          ${
-                            row.status === 'approved'
-                              ? `
-                                <button
-                                  class="btn secondary"
-                                  onclick="downloadApprovedReport('${row.id}')"
-                                >
-                                  ${I('download')}
-
-                                  ${t(
-                                    'تنزيل PDF',
-                                    'Download PDF'
-                                  )}
-                                </button>
-                              `
-                              : ''
-                          }
-                        </div>
-                      </td>
-                    </tr>
-                  `;
-                })
-                .join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function scoreModel() {
-  const criticalImmediate =
-    Math.round(
-      scorePolicy.severity.critical *
-      scorePolicy.typeMultiplier.immediate
-    );
-
-  const mediumTimed =
-    Math.round(
-      scorePolicy.severity.medium *
-      scorePolicy.typeMultiplier.timed
-    );
-
-  const example =
-    Math.max(
-      0,
-      100 -
-      criticalImmediate -
-      mediumTimed
-    );
-
-  return `
-    <div class="view">
-      ${toolbar(
-        'معادلة تقييم المشروع من 100',
-        'Project Score Model out of 100',
-        'مقارنة واضحة بين نسبة مطابقة الزيارة ونموذج الخصم من 100 قبل اعتماد المعادلة النهائية',
-        'Clear comparison between visit compliance and 100 point deduction before final approval',
-        B(
+        ${badge(
           t(
-            'مقترح غير معتمد',
-            'Proposal · not final'
+            "مطلوب",
+            "Required"
           ),
-          'warning'
-        )
-      )}
-
-      <div class="grid2">
-        <div class="card scoringOption">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'النموذج أ · نسبة المطابقة بالأوزان',
-                  'Model A · Weighted compliance percentage'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'يقيس مطابقة نموذج التفتيش نفسه',
-                  'Measures compliance with the inspection form'
-                )}
-              </p>
-            </div>
-
-            ${B(
-              '66.7%',
-              'info'
-            )}
-          </div>
-
-          <div class="formulaBox">
-            ${t(
-              'مجموع أوزان البنود المطابقة',
-              'Compliant weights'
-            )}
-
-            ÷
-
-            ${t(
-              'مجموع أوزان البنود المنطبقة',
-              'Applicable weights'
-            )}
-
-            × 100
-          </div>
-
-          <p class="explain">
-            ${t(
-              'مثال 10 و20 و30 و40 حيث البند 40 لا ينطبق والبند 20 غير مطابق فتكون النتيجة 40 ÷ 60 = 66.7 بالمائة',
-              'Example weights 10 20 30 40 where 40 is N/A and 20 is non compliant gives 40 ÷ 60 = 66.7%'
-            )}
-          </p>
-        </div>
-
-        <div class="card scoringOption recommended">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'النموذج ب · تقييم المشروع من 100 بالخصم',
-                  'Model B · 100 point project deduction score'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'المطلوب الجديد ويحتاج اعتماد جدول الخصومات',
-                  'New requested method and deduction matrix requires approval'
-                )}
-              </p>
-            </div>
-
-            ${B(
-              example + '%',
-              'success'
-            )}
-          </div>
-
-          <div class="formulaBox">
-            100
-            −
-            ${t(
-              'مجموع الخصومات حسب نوع المخالفة وخطورتها',
-              'sum of deductions by finding type and severity'
-            )}
-          </div>
-
-          <div class="deductionMatrix">
-            <div>
-              <span>
-                ${t(
-                  'منخفضة',
-                  'Low'
-                )}
-              </span>
-
-              <b>-2</b>
-            </div>
-
-            <div>
-              <span>
-                ${t(
-                  'متوسطة',
-                  'Medium'
-                )}
-              </span>
-
-              <b>-5</b>
-            </div>
-
-            <div>
-              <span>
-                ${t(
-                  'عالية',
-                  'High'
-                )}
-              </span>
-
-              <b>-10</b>
-            </div>
-
-            <div>
-              <span>
-                ${t(
-                  'حرجة',
-                  'Critical'
-                )}
-              </span>
-
-              <b>-20</b>
-            </div>
-          </div>
-
-          <p class="explain">
-            ${t(
-              `مثال تجريبي فقط حالة حرجة فورية = ${criticalImmediate} خصم وحالة متوسطة بمهلة = ${mediumTimed} خصم فيصبح التقييم ${example} من 100`,
-              `Demo example only critical immediate equals ${criticalImmediate} deduction and medium timed equals ${mediumTimed} giving ${example} out of 100`
-            )}
-          </p>
-
-          <div class="policyHint">
-            ${I('triangle-alert')}
-
-            ${t(
-              'قيم الخصم والمعاملات أمثلة للعرض فقط ولن تعتمد قبل موافقة العميل كتابة',
-              'Deduction values and multipliers are demo examples only and will not be finalized without written approval'
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div
-        class="card"
-        style="margin-top:14px"
-      >
-        <div class="cardHead">
-          <div>
-            <h3 class="cardTitle">
-              ${t(
-                'الفصل المقترح بين المؤشرين',
-                'Proposed separation between the two metrics'
-              )}
-            </h3>
-
-            <p class="sub">
-              ${t(
-                'لتجنب خلط نتيجتين مختلفتين في رقم واحد بدون تعريف',
-                'Avoid mixing two different concepts into one undefined score'
-              )}
-            </p>
-          </div>
-        </div>
-
-        <div class="comparisonGrid">
-          <div>
-            ${I('clipboard-check')}
-
-            <b>
-              ${t(
-                'نسبة مطابقة الزيارة',
-                'Visit compliance'
-              )}
-            </b>
-
-            <span>
-              ${t(
-                'تقيس أداء بنود النموذج مع استبعاد لا ينطبق',
-                'Measures form compliance with N/A excluded'
-              )}
-            </span>
-          </div>
-
-          <div>
-            ${I('gauge')}
-
-            <b>
-              ${t(
-                'تقييم المشروع من 100',
-                'Project score out of 100'
-              )}
-            </b>
-
-            <span>
-              ${t(
-                'يحسب من المخالفات المعتمدة ونوعها وخطورتها وفق جدول خصم معتمد',
-                'Calculated from approved findings using an agreed deduction matrix'
-              )}
-            </span>
-          </div>
-        </div>
-
-        <p
-          class="sub"
-          style="margin-top:12px"
-        >
-          ${t(
-            'قبل البرمجة النهائية يجب اعتماد قيم الخصم وحدودها وتأثير التكرار وهل المؤشر الرسمي يكون الخصم فقط أم يظهر المؤشران معًا',
-            'Before production build approve deduction values caps recurrence treatment and whether one or both metrics are official'
-          )}
-        </p>
-      </div>
-    </div>
-  `;
-}
-
-function analytics() {
-  const data =
-    S.role === 'project_manager'
-      ? projects.filter(
-          project => project.id === 'P-001'
-        )
-      : projects;
-
-  const employees =
-    data.reduce(
-      (
-        total,
-        project
-      ) => {
-        return (
-          total +
-          project.employees
-        );
-      },
-      0
-    );
-
-  const findings =
-    data.reduce(
-      (
-        total,
-        project
-      ) => {
-        return (
-          total +
-          project.findings
-        );
-      },
-      0
-    );
-
-  const ratio =
-    (
-      findings /
-      employees *
-      100
-    ).toFixed(1);
-
-  const avgClose =
-    (
-      data.reduce(
-        (
-          total,
-          project
-        ) => {
-          return (
-            total +
-            project.avgClose
-          );
-        },
-        0
-      ) /
-      data.length
-    ).toFixed(1);
-
-  const complaints =
-    data.reduce(
-      (
-        total,
-        project
-      ) => {
-        return (
-          total +
-          project.complaints
-        );
-      },
-      0
-    );
-
-  const nearestContract =
-    Math.min(
-      ...data.map(
-        project =>
-          project.contractDays
-      )
-    );
-
-  return `
-    <div class="view">
-      ${toolbar(
-        'التحليلات والتقارير داخل النظام',
-        'In-app Analytics & Reports',
-        'التحليلات داخل النظام بدون Power BI أو اشتراك تحليل إضافي',
-        'Analytics are built in-app without Power BI or extra analytics subscription',
-        `
-          <div class="filterGroup">
-            <select class="select small">
-              <option>
-                ${
-                  S.role === 'project_manager'
-                    ? projectName('P-001')
-                    : t(
-                        'كل المشاريع',
-                        'All projects'
-                      )
-                }
-              </option>
-            </select>
-
-            <select class="select small">
-              <option>
-                ${t(
-                  'يومي',
-                  'Daily'
-                )}
-              </option>
-
-              <option>
-                ${t(
-                  'أسبوعي',
-                  'Weekly'
-                )}
-              </option>
-
-              <option selected>
-                ${t(
-                  'شهري',
-                  'Monthly'
-                )}
-              </option>
-
-              <option>
-                ${t(
-                  'سنوي',
-                  'Yearly'
-                )}
-              </option>
-
-              <option>
-                ${t(
-                  'فترة مخصصة',
-                  'Custom'
-                )}
-              </option>
-            </select>
-          </div>
-        `
-      )}
-
-      <div class="kpis analyticsKpis">
-        <div class="kpi">
-          <b>88%</b>
-
-          <span>
-            ${t(
-              'متوسط الالتزام',
-              'Compliance'
-            )}
-          </span>
-        </div>
-
-        <div class="kpi">
-          <b>
-            ${ratio}%
-          </b>
-
-          <span>
-            ${t(
-              'الملاحظات إلى الموظفين',
-              'Findings / employees'
-            )}
-          </span>
-        </div>
-
-        <div class="kpi">
-          <b>
-            ${avgClose}
-          </b>
-
-          <span>
-            ${t(
-              'متوسط أيام الإغلاق',
-              'Avg closure days'
-            )}
-          </span>
-        </div>
-
-        <div class="kpi">
-          <b>
-            ${complaints}
-          </b>
-
-          <span>
-            ${t(
-              'الشكاوى',
-              'Complaints'
-            )}
-          </span>
-        </div>
-
-        <div
-          class="
-            kpi
-            ${
-              nearestContract <= 30
-                ? 'kpiDanger'
-                : ''
-            }
-          "
-        >
-          <b>
-            ${nearestContract}
-          </b>
-
-          <span>
-            ${t(
-              'يوم لأقرب عقد',
-              'days to nearest contract expiry'
-            )}
-          </span>
-        </div>
-      </div>
-
-      <div class="grid2">
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'اتجاه التحسن',
-                  'Improvement trend'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'الضغط على العمود يفتح الحالات التي كونت الرقم',
-                  'Click a bar to drill into cases behind the number'
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div class="chart">
-            ${[
-              66,
-              71,
-              79,
-              75,
-              86,
-              92
-            ]
-              .map(
-                (
-                  height,
-                  index
-                ) => {
-                  const arMonths = [
-                    'مايو',
-                    'يونيو',
-                    'يوليو',
-                    'أغسطس',
-                    'سبتمبر',
-                    'أكتوبر'
-                  ];
-
-                  const enMonths = [
-                    'May',
-                    'Jun',
-                    'Jul',
-                    'Aug',
-                    'Sep',
-                    'Oct'
-                  ];
-
-                  return `
-                    <div class="barCol">
-                      <div
-                        class="
-                          bar
-                          ${
-                            index === 5
-                              ? 'gold'
-                              : ''
-                          }
-                        "
-                        style="
-                          height:${height}%
-                        "
-                        onclick="
-                          toast(
-                            t(
-                              'فتح تفاصيل الزيارات والحالات لهذه الفترة',
-                              'Opening visits and cases for this period'
-                            )
-                          )
-                        "
-                      ></div>
-
-                      <span>
-                        ${t(
-                          arMonths[index],
-                          enMonths[index]
-                        )}
-                      </span>
-                    </div>
-                  `;
-                }
-              )
-              .join('')}
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'الملاحظات الأكثر تكرارًا',
-                  'Most repeated findings'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'البلاغات الحساسة مستبعدة بالكامل من التحليلات',
-                  'Sensitive reports are excluded from analytics'
-                )}
-              </p>
-            </div>
-          </div>
-
-          ${[
-            [
-              'سجل الزوار',
-              'Visitor log',
-              12,
-              82
-            ],
-
-            [
-              'بوابات الطوارئ',
-              'Emergency gates',
-              8,
-              62
-            ],
-
-            [
-              'جولات الحراسة',
-              'Guard patrols',
-              6,
-              48
-            ],
-
-            [
-              'الزي الرسمي',
-              'Uniform',
-              4,
-              34
-            ]
-          ]
-            .map(item => {
-              return `
-                <div
-                  style="
-                    margin-bottom:10px
-                  "
-                >
-                  <div
-                    style="
-                      display:flex;
-                      justify-content:space-between;
-                      font-size:10px
-                    "
-                  >
-                    <span>
-                      ${t(
-                        item[0],
-                        item[1]
-                      )}
-                    </span>
-
-                    <span>
-                      ${item[2]}
-                      ${t(
-                        'حالة',
-                        'cases'
-                      )}
-                    </span>
-                  </div>
-
-                  <div class="progress">
-                    <span
-                      style="
-                        width:${item[3]}%
-                      "
-                    ></span>
-                  </div>
-                </div>
-              `;
-            })
-            .join('')}
-        </div>
-      </div>
-
-      <div
-        class="card"
-        style="margin-top:14px"
-      >
-        <div class="cardHead">
-          <div>
-            <h3 class="cardTitle">
-              ${t(
-                'ترتيب المشاريع متعدد المؤشرات',
-                'Multi-metric project ranking'
-              )}
-            </h3>
-
-            <p class="sub">
-              ${t(
-                'حسب عدد الملاحظات والتحسن والشكاوى وقرب انتهاء العقد ومدة الإغلاق',
-                'By findings improvement complaints contract expiry and closure time'
-              )}
-            </p>
-          </div>
-        </div>
-
-        <div class="table">
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  ${t(
-                    'المشروع',
-                    'Project'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'الموظفون',
-                    'Employees'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'الملاحظات',
-                    'Findings'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'النسبة للموظفين',
-                    'Finding ratio'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'متوسط الإغلاق',
-                    'Avg closure'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'التحسن',
-                    'Improvement'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'الشكاوى',
-                    'Complaints'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'انتهاء العقد',
-                    'Contract expiry'
-                  )}
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              ${data
-                .map(project => {
-                  return `
-                    <tr>
-                      <td>
-                        <b>
-                          ${
-                            S.lang === 'ar'
-                              ? project.ar
-                              : project.en
-                          }
-                        </b>
-                      </td>
-
-                      <td>
-                        ${project.employees}
-                      </td>
-
-                      <td>
-                        ${project.findings}
-                      </td>
-
-                      <td>
-                        ${(
-                          project.findings /
-                          project.employees *
-                          100
-                        ).toFixed(1)}%
-                      </td>
-
-                      <td>
-                        ${project.avgClose}
-
-                        ${t(
-                          'يوم',
-                          'days'
-                        )}
-                      </td>
-
-                      <td>
-                        +${project.improvement}%
-                      </td>
-
-                      <td>
-                        ${project.complaints}
-                      </td>
-
-                      <td>
-                        ${B(
-                          project.contractDays +
-                            ' ' +
-                            t(
-                              'يوم',
-                              'days'
-                            ),
-                          project.contractDays <= 30
-                            ? 'danger'
-                            : project.contractDays <= 60
-                              ? 'warning'
-                              : 'success'
-                        )}
-                      </td>
-                    </tr>
-                  `;
-                })
-                .join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div
-        class="grid3"
-        style="margin-top:14px"
-      >
-        <div class="card miniReport">
-          ${I('calendar-days')}
-
-          <b>
-            ${t(
-              'تقرير يومي',
-              'Daily report'
-            )}
-          </b>
-
-          <span>
-            ${t(
-              'زيارات اليوم والملاحظات الحرجة والمتأخرات',
-              'Today visits critical findings and overdue actions'
-            )}
-          </span>
-        </div>
-
-        <div class="card miniReport">
-          ${I('calendar-range')}
-
-          <b>
-            ${t(
-              'تقرير أسبوعي',
-              'Weekly report'
-            )}
-          </b>
-
-          <span>
-            ${t(
-              'الاتجاه والتكرار والإغلاقات والتصعيد',
-              'Trend recurrence closures and escalations'
-            )}
-          </span>
-        </div>
-
-        <div class="card miniReport">
-          ${I('calendar-check')}
-
-          <b>
-            ${t(
-              'شهري وسنوي',
-              'Monthly & yearly'
-            )}
-          </b>
-
-          <span>
-            ${t(
-              'المقارنات والتحسن والشكاوى والعقود',
-              'Comparisons improvement complaints and contracts'
-            )}
-          </span>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function registration() {
-  return `
-    <div class="view">
-      ${toolbar(
-        'التسجيل والتعهد وتفعيل الحساب',
-        'Registration Undertaking & Activation',
-        'التعهد والتوقيع إلزاميان قبل تفعيل كل الحسابات حتى التي تنشئها الإدارة',
-        'Undertaking and signature are mandatory before activating every account including admin created accounts',
-        ''
-      )}
-
-      <div class="grid2">
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'طلب حساب من المستخدم',
-                  'User requested account'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'لا يرسل الطلب بدون التعهد والتوقيع',
-                  'Cannot submit without undertaking and signature'
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div class="formGrid">
-            <div class="field">
-              <label>
-                ${t(
-                  'الاسم',
-                  'Name'
-                )}
-              </label>
-
-              <input
-                class="input"
-                value="${t(
-                  'عبدالله السبيعي',
-                  'Abdullah Al Subaie'
-                )}"
-              >
-            </div>
-
-            <div class="field">
-              <label>
-                ${t(
-                  'الرقم الوظيفي',
-                  'Employee no.'
-                )}
-              </label>
-
-              <input
-                class="input"
-                value="EMP-3012"
-              >
-            </div>
-
-            <div class="field">
-              <label>
-                ${t(
-                  'رقم الهوية',
-                  'National ID'
-                )}
-              </label>
-
-              <input
-                class="input"
-                value="109***821"
-              >
-            </div>
-
-            <div class="field">
-              <label>
-                ${t(
-                  'البريد',
-                  'Email'
-                )}
-              </label>
-
-              <input
-                class="input"
-                value="abdullah@example.test"
-              >
-            </div>
-
-            <div class="field span2">
-              <label>
-                ${t(
-                  'التعهد v1.2',
-                  'Undertaking v1.2'
-                )}
-              </label>
-
-              <div class="sensitive">
-                <div>
-                  <b>
-                    ${t(
-                      'أقر بصحة البيانات والالتزام بسياسات الاستخدام والسرية',
-                      'I confirm the accuracy of my data and agree to confidentiality and usage policies'
-                    )}
-                  </b>
-
-                  <p>
-                    ${t(
-                      'يحفظ إصدار التعهد وتاريخ الموافقة والتوقيع مع الطلب',
-                      'Undertaking version consent time and signature are stored with the request'
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div class="field span2">
-              <label>
-                ${t(
-                  'التوقيع الإلكتروني',
-                  'Electronic signature'
-                )}
-              </label>
-
-              <canvas
-                id="sig"
-                width="620"
-                height="140"
-                style="
-                  width:100%;
-                  height:140px;
-                  background:#0b1926;
-                  border:1px solid var(--line);
-                  border-radius:12px;
-                  touch-action:none
-                "
-              ></canvas>
-
-              <div
-                style="
-                  display:flex;
-                  gap:7px;
-                  margin-top:7px
-                "
-              >
-                <button
-                  class="btn"
-                  onclick="clearSig()"
-                >
-                  ${t(
-                    'مسح',
-                    'Clear'
-                  )}
-                </button>
-
-                <button
-                  class="btn primary"
-                  onclick="submitRegistration()"
-                >
-                  ${I('signature')}
-
-                  ${t(
-                    'توقيع وإرسال الطلب',
-                    'Sign & submit'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'الحساب الذي تنشئه الإدارة',
-                  'Admin-created account'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'لا يتفعل مباشرة بعد الإنشاء',
-                  'It is not activated immediately after creation'
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div class="accountFlow">
-            <div class="flowStep done">
-              <span>1</span>
-
-              <div>
-                <b>
-                  ${t(
-                    'إنشاء سجل الحساب',
-                    'Create account record'
-                  )}
-                </b>
-
-                <small>
-                  ${t(
-                    'الدور والمشاريع محددة',
-                    'Role and projects assigned'
-                  )}
-                </small>
-              </div>
-            </div>
-
-            <div class="flowStep current">
-              <span>2</span>
-
-              <div>
-                <b>
-                  ${t(
-                    'إرسال رابط التعهد والتوقيع',
-                    'Send undertaking and signature link'
-                  )}
-                </b>
-
-                <small>
-                  ${t(
-                    'الحساب يبقى غير مفعل',
-                    'Account remains inactive'
-                  )}
-                </small>
-              </div>
-            </div>
-
-            <div class="flowStep">
-              <span>3</span>
-
-              <div>
-                <b>
-                  ${t(
-                    'توقيع المستخدم',
-                    'User signs undertaking'
-                  )}
-                </b>
-
-                <small>
-                  ${t(
-                    'يحفظ الإصدار والتاريخ والتوقيع',
-                    'Version date and signature stored'
-                  )}
-                </small>
-              </div>
-            </div>
-
-            <div class="flowStep">
-              <span>4</span>
-
-              <div>
-                <b>
-                  ${t(
-                    'إشعار إدارة الجودة',
-                    'Notify Quality Management'
-                  )}
-                </b>
-
-                <small>
-                  ${t(
-                    'جاهز للمراجعة والتفعيل',
-                    'Ready for review and activation'
-                  )}
-                </small>
-              </div>
-            </div>
-
-            <div class="flowStep">
-              <span>5</span>
-
-              <div>
-                <b>
-                  ${t(
-                    'التفعيل والتأكيد',
-                    'Activation & confirmation'
-                  )}
-                </b>
-
-                <small>
-                  ${t(
-                    'تأكيد للمستخدم ورابط آمن لتعيين كلمة المرور',
-                    'User confirmation and secure password setup'
-                  )}
-                </small>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div
-        class="card"
-        style="margin-top:14px"
-      >
-        <div class="cardHead">
-          <div>
-            <h3 class="cardTitle">
-              ${t(
-                'طلبات بانتظار إدارة الجودة',
-                'Requests pending Quality Management'
-              )}
-            </h3>
-
-            <p class="sub">
-              ${t(
-                'بعد اكتمال التعهد والتوقيع يصل إشعار لإدارة الجودة للمراجعة',
-                'After undertaking and signature completion Quality Management is notified'
-              )}
-            </p>
-          </div>
-        </div>
-
-        ${listItem(
-          'signature',
-          t(
-            'عبدالله السبيعي',
-            'Abdullah Al Subaie'
-          ),
-          t(
-            'طلب ذاتي · تعهد v1.2 · توقيع محفوظ',
-            'Self request · undertaking v1.2 · signature stored'
-          ),
-          B(
-            t(
-              'جاهز للمراجعة',
-              'Ready for review'
-            ),
-            'warning'
-          )
+          "danger"
         )}
 
-        ${listItem(
-          'user-plus',
-          t(
-            'ناصر الشمري',
-            'Nasser Al Shammari'
-          ),
-          t(
-            'أنشأته الإدارة · أرسل رابط التعهد · لم يوقع بعد',
-            'Admin created · undertaking link sent · not signed yet'
-          ),
-          B(
-            t(
-              'بانتظار التوقيع',
-              'Awaiting signature'
-            ),
-            'info'
-          )
-        )}
-
-        <div
-          class="policyHint"
-          style="margin-top:10px"
-        >
-          ${I('mail-check')}
-
-          ${t(
-            'بعد التفعيل يصل تأكيد للمستخدم ولا يتم إرسال كلمة المرور نفسها بالبريد',
-            'After activation user receives confirmation and the password itself is never emailed'
-          )}
-        </div>
       </div>
-    </div>
-  `;
-}
 
-function users() {
-  return `
-    <div class="view">
-      ${toolbar(
-        'الحسابات والصلاحيات',
-        'Accounts & Permissions',
-        'قوالب أدوار جاهزة مع تحديد المشاريع ونطاق البيانات',
-        'Ready role templates plus assigned projects and data scope',
-        `
-          <button
-            class="btn primary"
-            onclick="userModal()"
-          >
-            ${I('user-plus')}
+      <div class="formGrid">
 
+        <div class="field">
+
+          <label>
             ${t(
-              'حساب جديد',
-              'New account'
+              "نوع الملاحظة",
+              "Finding type"
             )}
-          </button>
-        `
-      )}
+          </label>
 
-      <div class="grid2">
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'قوالب الأدوار',
-                  'Role templates'
-                )}
-              </h3>
+          <select class="input">
 
-              <p class="sub">
-                ${t(
-                  'تعديل القالب يسجل في سجل العمليات',
-                  'Template changes are audit logged'
-                )}
-              </p>
-            </div>
-          </div>
+            <option>
+              ${t(
+                "حالة فورية",
+                "Immediate case"
+              )}
+            </option>
 
-          ${listItem(
-            'shield-check',
-            t(
-              'إدارة قسم الجودة',
-              'Quality Management'
-            ),
-            t(
-              'كل التشغيل بدون البلاغات الحساسة تلقائيًا',
-              'All operations without automatic sensitive access'
-            )
-          )}
+            <option>
+              ${t(
+                "معالجة خلال مدة محددة",
+                "Time-bound case"
+              )}
+            </option>
 
-          ${listItem(
-            'badge-check',
-            t(
-              'موظف الجودة',
-              'Quality Officer'
-            ),
-            t(
-              'مراجعة ومتابعة حسب المصفوفة',
-              'Review and follow-up per matrix'
-            )
-          )}
+            <option>
+              ${t(
+                "تحسين طويل المدى",
+                "Long-term improvement"
+              )}
+            </option>
 
-          ${listItem(
-            'clipboard-check',
-            t(
-              'مفتش الجودة',
-              'Quality Inspector'
-            ),
-            t(
-              'زياراته ونماذجه فقط بدون نتائج وتحليلات',
-              'Assigned visits and forms only without results or analytics'
-            )
-          )}
+          </select>
 
-          ${listItem(
-            'briefcase-business',
-            t(
-              'مدير المشروع',
-              'Project Manager'
-            ),
-            t(
-              'مشاريعه فقط',
-              'Assigned projects only'
-            )
-          )}
-
-          ${listItem(
-            'users',
-            t(
-              'مشرف الحراس',
-              'Guard Supervisor'
-            ),
-            t(
-              'تقييم الحراس وطلبات التدريب',
-              'Guard evaluation and training requests'
-            )
-          )}
         </div>
 
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'حالات الحسابات',
-                  'Account states'
-                )}
-              </h3>
+        <div class="field">
 
-              <p class="sub">
-                ${t(
-                  'تعطيل الحساب لا يحذف السجل التاريخي',
-                  'Disabling an account never deletes history'
-                )}
-              </p>
-            </div>
-          </div>
+          <label>
+            ${t(
+              "الخطورة",
+              "Severity"
+            )}
+          </label>
 
-          ${listItem(
-            'user-x',
-            t(
-              'حساب مفتش معطل',
-              'Disabled inspector account'
-            ),
-            t(
-              'لا يستطيع الدخول وكل قراراته وسجلاته محفوظة',
-              'Cannot sign in and all historical records remain'
-            ),
-            B(
-              t(
-                'معطل',
-                'Disabled'
-              ),
-              'danger'
-            )
-          )}
+          <select class="input">
 
-          ${listItem(
-            'refresh-ccw',
-            t(
-              'إعادة تعيين كلمة المرور',
-              'Password reset'
-            ),
-            t(
-              'رابط مؤقت وآمن ولا ترسل كلمة المرور نفسها',
-              'Secure temporary link and password itself is never emailed'
-            ),
-            B(
-              t(
-                'آمن',
-                'Secure'
-              ),
-              'success'
-            )
-          )}
+            <option>
+              ${t(
+                "حرجة",
+                "Critical"
+              )}
+            </option>
+
+            <option>
+              ${t(
+                "عالية",
+                "High"
+              )}
+            </option>
+
+            <option>
+              ${t(
+                "متوسطة",
+                "Medium"
+              )}
+            </option>
+
+            <option>
+              ${t(
+                "منخفضة",
+                "Low"
+              )}
+            </option>
+
+          </select>
+
         </div>
+
       </div>
 
       <div
-        class="card"
-        style="margin-top:14px"
+        class="permissionNotice"
+        style="margin-top:10px"
       >
-        ${permissionMatrix()}
-      </div>
-    </div>
-  `;
-}
 
-function permissionMatrix() {
-  const rows = [
-    [
-      t(
-        'إدارة المشاريع',
-        'Manage projects'
-      ),
-      1,
-      1,
-      0,
-      0,
-      0,
-      0
-    ],
+        ${icon("siren")}
 
-    [
-      t(
-        'جدولة الزيارات',
-        'Schedule visits'
-      ),
-      0,
-      1,
-      0,
-      0,
-      0,
-      0
-    ],
-
-    [
-      t(
-        'تعبئة التفتيش',
-        'Fill inspection'
-      ),
-      0,
-      0,
-      0,
-      1,
-      0,
-      0
-    ],
-
-    [
-      t(
-        'مراجعة التفتيش',
-        'Review inspection'
-      ),
-      0,
-      1,
-      1,
-      0,
-      0,
-      0
-    ],
-
-    [
-      t(
-        'الاعتماد',
-        'Approve'
-      ),
-      0,
-      1,
-      0,
-      0,
-      0,
-      0
-    ],
-
-    [
-      t(
-        'عرض التحليلات',
-        'View analytics'
-      ),
-      1,
-      1,
-      0,
-      0,
-      1,
-      0
-    ],
-
-    [
-      t(
-        'تقييم الحراس',
-        'Evaluate guards'
-      ),
-      0,
-      0,
-      0,
-      1,
-      0,
-      1
-    ],
-
-    [
-      t(
-        'طلبات التدريب',
-        'Training requests'
-      ),
-      0,
-      1,
-      0,
-      0,
-      1,
-      1
-    ],
-
-    [
-      t(
-        'إدارة سياسة التصعيد',
-        'Manage escalation policy'
-      ),
-      0,
-      1,
-      0,
-      0,
-      0,
-      0
-    ],
-
-    [
-      t(
-        'إدارة معادلة التقييم',
-        'Manage scoring model'
-      ),
-      0,
-      1,
-      0,
-      0,
-      0,
-      0
-    ]
-  ];
-
-  const permission = value => {
-    return `
-      <span
-        class="
-          perm
-          ${value ? 'y' : 'n'}
-        "
-      >
-        ${I(
-          value
-            ? 'check'
-            : 'x'
-        )}
-      </span>
-    `;
-  };
-
-  return `
-    <div class="cardHead">
-      <div>
-        <h3 class="cardTitle">
+        <span>
           ${t(
-            'مصفوفة الصلاحيات المختصرة',
-            'Condensed Permission Matrix'
+            "إذا كانت الحالة حرجة يتم إرسال إشعار فوري لإدارة المشروع عند تسجيلها",
+            "Critical findings trigger an immediate Project Management notification"
           )}
-        </h3>
+        </span>
 
-        <p class="sub">
-          ${t(
-            'المشاهدة والإضافة والتعديل والإرسال والمراجعة والاعتماد والرفض والتنزيل والتصدير تفصل نهائيًا في الوثيقة',
-            'View add edit submit review approve reject download and export are finalized separately in the permission matrix'
-          )}
-        </p>
       </div>
-    </div>
 
-    <div class="table">
-      <table class="matrix">
-        <thead>
-          <tr>
-            <th>
-              ${t(
-                'الوظيفة',
-                'Function'
-              )}
-            </th>
-
-            <th>
-              ${t(
-                'المالك',
-                'Owner'
-              )}
-            </th>
-
-            <th>
-              ${t(
-                'إدارة الجودة',
-                'Quality Mgmt'
-              )}
-            </th>
-
-            <th>
-              ${t(
-                'موظف الجودة',
-                'Quality Officer'
-              )}
-            </th>
-
-            <th>
-              ${t(
-                'المفتش',
-                'Inspector'
-              )}
-            </th>
-
-            <th>
-              ${t(
-                'مدير المشروع',
-                'Project Manager'
-              )}
-            </th>
-
-            <th>
-              ${t(
-                'مشرف الحراس',
-                'Guard Supervisor'
-              )}
-            </th>
-          </tr>
-        </thead>
-
-        <tbody>
-          ${rows
-            .map(row => {
-              return `
-                <tr>
-                  <td>
-                    ${row[0]}
-                  </td>
-
-                  ${row
-                    .slice(1)
-                    .map(value => {
-                      return `
-                        <td>
-                          ${permission(value)}
-                        </td>
-                      `;
-                    })
-                    .join('')}
-                </tr>
-              `;
-            })
-            .join('')}
-        </tbody>
-      </table>
     </div>
   `;
 }
 
-function permissionTest() {
-  return `
-    <div class="view">
-      ${toolbar(
-        'اختبار الصلاحيات',
-        'Permission Tests',
-        'اختبار الواجهة والرابط المباشر والبحث والتنزيل والتصدير على حسابات ومشروعين',
-        'Test UI direct URLs search downloads and exports across roles and two projects',
-        ''
-      )}
+function answerQuestion(
+  id,
+  answer
+) {
+  state.answers[id] =
+    answer;
 
-      <div class="grid2">
-        <div class="card">
-          <h3 class="cardTitle">
-            ${t(
-              'اختبار مدير المشروع',
-              'Project Manager test'
-            )}
-          </h3>
-
-          <p class="sub">
-            ${t(
-              'مدير الواحة يحاول فتح مشروع بوابة النخيل',
-              'Al Waha manager tries to open Palm Gate'
-            )}
-          </p>
-
-          <button
-            class="btn dangerBtn"
-            style="margin-top:12px"
-            onclick="accessDenied()"
-          >
-            ${I('shield-x')}
-
-            ${t(
-              'محاولة فتح مشروع غير مصرح',
-              'Try unauthorized project'
-            )}
-          </button>
-        </div>
-
-        <div class="card">
-          <h3 class="cardTitle">
-            ${t(
-              'اختبار المفتش',
-              'Inspector test'
-            )}
-          </h3>
-
-          <p class="sub">
-            ${t(
-              'المفتش يحاول فتح التحليلات العامة',
-              'Inspector tries to open analytics'
-            )}
-          </p>
-
-          <button
-            class="btn dangerBtn"
-            style="margin-top:12px"
-            onclick="
-              toast(
-                t(
-                  '403 Access Denied — المفتش لا يملك صلاحية التحليلات',
-                  '403 Access Denied — inspector has no analytics permission'
-                )
-              )
-            "
-          >
-            ${I('shield-x')}
-
-            ${t(
-              'محاولة فتح التحليلات',
-              'Try analytics'
-            )}
-          </button>
-        </div>
-      </div>
-
-      <div
-        class="card"
-        style="margin-top:14px"
-      >
-        <div class="table">
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  ${t(
-                    'الاختبار',
-                    'Test'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'النتيجة المتوقعة',
-                    'Expected result'
-                  )}
-                </th>
-
-                <th>
-                  ${t(
-                    'الحالة',
-                    'Status'
-                  )}
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              <tr>
-                <td>
-                  ${t(
-                    'تغيير رقم المشروع في الرابط',
-                    'Change project ID in URL'
-                  )}
-                </td>
-
-                <td>
-                  403
-                </td>
-
-                <td>
-                  ${B(
-                    t(
-                      'يمر',
-                      'Pass'
-                    ),
-                    'success'
-                  )}
-                </td>
-              </tr>
-
-              <tr>
-                <td>
-                  ${t(
-                    'بحث عن سجل خارج النطاق',
-                    'Search out-of-scope record'
-                  )}
-                </td>
-
-                <td>
-                  ${t(
-                    'لا يظهر',
-                    'Hidden'
-                  )}
-                </td>
-
-                <td>
-                  ${B(
-                    t(
-                      'يمر',
-                      'Pass'
-                    ),
-                    'success'
-                  )}
-                </td>
-              </tr>
-
-              <tr>
-                <td>
-                  ${t(
-                    'تنزيل ملف من مشروع آخر',
-                    'Download another project attachment'
-                  )}
-                </td>
-
-                <td>
-                  403
-                </td>
-
-                <td>
-                  ${B(
-                    t(
-                      'يمر',
-                      'Pass'
-                    ),
-                    'success'
-                  )}
-                </td>
-              </tr>
-
-              <tr>
-                <td>
-                  ${t(
-                    'تصدير بيانات مشروع آخر',
-                    'Export other project data'
-                  )}
-                </td>
-
-                <td>
-                  ${t(
-                    'يمنع',
-                    'Blocked'
-                  )}
-                </td>
-
-                <td>
-                  ${B(
-                    t(
-                      'يمر',
-                      'Pass'
-                    ),
-                    'success'
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <p
-          class="sub"
-          style="margin-top:10px"
-        >
-          ${t(
-            'في الديمو هذه محاكاة وفي النظام النهائي يطبق المنع فعليًا في Laravel Middleware وPolicies وQueries وPrivate Storage',
-            'In this demo this is simulated and production enforcement is server side through Laravel Middleware Policies Queries and Private Storage'
-          )}
-        </p>
-      </div>
-    </div>
-  `;
+  render();
 }
 
-function attachmentSettings() {
-  return `
-    <div class="view">
-      ${toolbar(
-        'سياسة المرفقات والفيديو',
-        'Attachment & Video Policy',
-        'الحدود النهائية تثبت بعد اختيار الاستضافة وحجم الاستخدام المتوقع',
-        'Final limits are approved after hosting capacity and expected usage are known',
-        ''
-      )}
-
-      <div class="grid2">
-        <div class="card">
-          <h3 class="cardTitle">
-            ${t(
-              'الحدود المقترحة',
-              'Proposed limits'
-            )}
-          </h3>
-
-          <div
-            class="list"
-            style="margin-top:12px"
-          >
-            ${listItem(
-              'image',
-              t(
-                'الصور',
-                'Images'
-              ),
-              t(
-                'حتى 15 MB قبل المعالجة · أطول ضلع 2560px',
-                'Up to 15 MB before processing · max side 2560px'
-              )
-            )}
-
-            ${listItem(
-              'video',
-              t(
-                'الفيديو',
-                'Video'
-              ),
-              t(
-                'حتى 90 ثانية و150 MB كاقتراح أولي',
-                'Up to 90 seconds and 150 MB as an initial proposal'
-              )
-            )}
-
-            ${listItem(
-              'files',
-              t(
-                'عدد المرفقات',
-                'Attachments per finding'
-              ),
-              t(
-                'حتى 10 مرفقات كاقتراح قابل للتعديل',
-                'Up to 10 as an adjustable proposal'
-              )
-            )}
-          </div>
-        </div>
-
-        <div class="card">
-          <h3 class="cardTitle">
-            ${t(
-              'الأصل أم النسخة المضغوطة',
-              'Original vs compressed'
-            )}
-          </h3>
-
-          <p class="sub">
-            ${t(
-              'القرار يؤثر على سعة التخزين والتكلفة وسرعة الرفع',
-              'Choice affects storage cost and upload performance'
-            )}
-          </p>
-
-          <div
-            class="formGrid"
-            style="margin-top:12px"
-          >
-            <label class="question">
-              <input
-                type="radio"
-                name="policy"
-                ${
-                  S.attachmentPolicy === 'compressed'
-                    ? 'checked'
-                    : ''
-                }
-                onchange="
-                  S.attachmentPolicy='compressed'
-                "
-              >
-
-              ${t(
-                'حفظ النسخة المضغوطة فقط',
-                'Store compressed copy only'
-              )}
-            </label>
-
-            <label class="question">
-              <input
-                type="radio"
-                name="policy"
-                ${
-                  S.attachmentPolicy === 'original_plus_compressed'
-                    ? 'checked'
-                    : ''
-                }
-                onchange="
-                  S.attachmentPolicy='original_plus_compressed'
-                "
-              >
-
-              ${t(
-                'حفظ الأصل + نسخة مضغوطة',
-                'Store original + compressed copy'
-              )}
-            </label>
-          </div>
-
-          <div
-            class="policyHint"
-            style="margin-top:10px"
-          >
-            ${I('info')}
-
-            ${t(
-              'سيتم شرح أثر الخيارين على التكلفة قبل شراء أي مساحة تخزين',
-              'Storage cost impact will be explained before purchasing any storage service'
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function audit() {
-  const items = [
-    [
-      t(
-        'منح تصريح بلاغ حساس',
-        'Granted sensitive-report access'
-      ),
-      t(
-        'سلطان ا · لسارة محمد · 11:07',
-        'Sultan A. · to Sarah Mohammed · 11:07'
-      )
-    ],
-
-    [
-      t(
-        'اعتماد تقرير',
-        'Approved report'
-      ),
-      'REP-2026-000094 · 10:46'
-    ],
-
-    [
-      t(
-        'إرسال تفتيش',
-        'Submitted inspection'
-      ),
-      'VIS-2026-000123 · 10:31'
-    ],
-
-    [
-      t(
-        'قرار طلب تدريب',
-        'Training decision'
-      ),
-      'TRN-2026-0015 · 09:55'
-    ],
-
-    [
-      t(
-        'إعادة جدولة زيارة',
-        'Rescheduled visit'
-      ),
-      t(
-        'VIS-2026-000127 · السبب والموعد القديم محفوظان',
-        'VIS-2026-000127 · reason and old schedule retained'
-      )
-    ]
-  ];
-
-  return `
-    <div class="view">
-      ${toolbar(
-        'سجل العمليات Audit Log',
-        'Audit Log',
-        'سجل إضافي غير قابل للتعديل أو الحذف يوثق من فعل ماذا ومتى',
-        'Append-only history of who did what and when',
-        ''
-      )}
-
-      <div class="card">
-        <div class="timeline">
-          ${items
-            .map(item => {
-              return `
-                <div class="tl">
-                  <b>
-                    ${item[0]}
-                  </b>
-
-                  <p>
-                    ${item[1]}
-                    ·
-                    IP
-                    ${t(
-                      'مسجل',
-                      'stored'
-                    )}
-                  </p>
-                </div>
-              `;
-            })
-            .join('')}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function backup() {
-  return `
-    <div class="view">
-      ${toolbar(
-        'النسخ الاحتياطي والاستعادة',
-        'Backup & Restore',
-        'نسخ قاعدة البيانات والمرفقات إلى مكان منفصل مع تجربة استعادة فعلية قبل التسليم',
-        'Database and attachments are backed up separately with a real restore test before handover',
-        ''
-      )}
-
-      <div class="backup">
-        <div class="card orbWrap">
-          <div
-            style="
-              text-align:center
-            "
-          >
-            <div class="orb">
-              ${I(
-                'database-backup'
-              )}
-            </div>
-
-            <h3>
-              ${t(
-                'النسخ يعمل بصورة طبيعية',
-                'Backup operating normally'
-              )}
-            </h3>
-
-            <p class="sub">
-              ${t(
-                'آخر نسخة مكتملة اليوم 04:10',
-                'Last completed backup today 04:10'
-              )}
-            </p>
-
-            ${B(
-              t(
-                'مشفر · موقع منفصل',
-                'Encrypted · separate location'
-              ),
-              'success'
-            )}
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'سياسة النسخ والاستعادة',
-                  'Backup & restore policy'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'الاحتفاظ المقترح 30 يومية + 12 شهرية وقابل للتعديل',
-                  'Proposed retention 30 daily + 12 monthly and adjustable'
-                )}
-              </p>
-            </div>
-
-            <button
-              class="btn primary"
-              onclick="restoreTest()"
-            >
-              ${I(
-                'rotate-ccw'
-              )}
-
-              ${t(
-                'تجربة استعادة',
-                'Restore test'
-              )}
-            </button>
-          </div>
-
-          ${listItem(
-            'calendar-clock',
-            t(
-              'نسخة يومية',
-              'Daily backup'
-            ),
-            t(
-              'قاعدة البيانات + المرفقات',
-              'Database + attachments'
-            ),
-            B(
-              t(
-                'نشط',
-                'Active'
-              ),
-              'success'
-            )
-          )}
-
-          ${listItem(
-            'archive',
-            t(
-              'نسخة شهرية',
-              'Monthly backup'
-            ),
-            t(
-              'احتفاظ طويل المدى',
-              'Long-term retention'
-            ),
-            B(
-              t(
-                'نشط',
-                'Active'
-              ),
-              'success'
-            )
-          )}
-
-          ${listItem(
-            'mail-check',
-            t(
-              'تنبيه النجاح والفشل',
-              'Success/failure alert'
-            ),
-            t(
-              'إشعار بريد لمالك النظام',
-              'Email notification to owner'
-            ),
-            B(
-              t(
-                'نشط',
-                'Active'
-              ),
-              'success'
-            )
-          )}
-
-          <div id="restoreResult"></div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function deliveryPlan() {
-  return `
-    <div class="view">
-      ${toolbar(
-        'خطة التنفيذ والتسليم والتشغيل',
-        'Delivery Support & Operations Plan',
-        'ملخص المدة والمراحل والدعم والتكاليف التشغيلية والتسليم النهائي قبل الاتفاق',
-        'Summary of duration phases support operating costs and final handover before agreement',
-        ''
-      )}
-
-      <div class="grid2">
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'المرحلة الأولى',
-                  'Phase 1'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'التأسيس والتشغيل الأساسي',
-                  'Foundation & core operations'
-                )}
-              </p>
-            </div>
-
-            ${B(
-              t(
-                '25 إلى 30 يوم عمل',
-                '25–30 working days'
-              ),
-              'info'
-            )}
-          </div>
-
-          <p class="explain">
-            ${t(
-              'الحسابات والصلاحيات والتعهد والمشاريع وجدولة المفتشين والنماذج والإصدارات والتفتيش والمرفقات وتقييم الحراس والمراجعة والإجراءات والبحث',
-              'Accounts permissions undertaking projects inspector scheduling forms versions inspection evidence guard evaluation review actions and search'
-            )}
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'المرحلة الثانية',
-                  'Phase 2'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'الوظائف المتقدمة والتقارير والتسليم',
-                  'Advanced functions reporting and handover'
-                )}
-              </p>
-            </div>
-
-            ${B(
-              t(
-                '20 إلى 25 يوم عمل',
-                '20–25 working days'
-              ),
-              'info'
-            )}
-          </div>
-
-          <p class="explain">
-            ${t(
-              'طلبات التدريب والبلاغات الحساسة وPDF وExcel والتحليلات والتصعيد والإشعارات وسجل العمليات والنسخ والاستعادة والاختبارات والتدريب والتسليم',
-              'Training requests sensitive reports PDF Excel analytics escalation notifications audit backup restore testing training and handover'
-            )}
-          </p>
-        </div>
-      </div>
-
-      <div
-        class="card"
-        style="margin-top:14px"
-      >
-        <div class="kpis deliveryKpis">
-          <div class="kpi">
-            <b>
-              45–55
-            </b>
-
-            <span>
-              ${t(
-                'يوم عمل تنفيذ',
-                'working days implementation'
-              )}
-            </span>
-          </div>
-
-          <div class="kpi">
-            <b>
-              5
-            </b>
-
-            <span>
-              ${t(
-                'أيام مراجعة مقترحة لكل مرحلة',
-                'suggested review days per phase'
-              )}
-            </span>
-          </div>
-
-          <div class="kpi">
-            <b>
-              7
-            </b>
-
-            <span>
-              ${t(
-                'أيام اختبار نهائي مقترحة',
-                'suggested final acceptance days'
-              )}
-            </span>
-          </div>
-
-          <div class="kpi">
-            <b>
-              60
-            </b>
-
-            <span>
-              ${t(
-                'يوم ضمان أخطاء',
-                'days defect warranty'
-              )}
-            </span>
-          </div>
-        </div>
-
-        <p class="sub">
-          ${t(
-            'مدة مراجعة العميل واختباره منفصلة عن أيام التنفيذ ويثبت الجدول النهائي قبل البداية',
-            'Client review time is separate from implementation working days and final schedule is fixed before start'
-          )}
-        </p>
-      </div>
-
-      <div
-        class="grid2"
-        style="margin-top:14px"
-      >
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'تكاليف التشغيل',
-                  'Operating costs'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'لا تفعل أي خدمة مدفوعة قبل موافقة العميل',
-                  'No paid service is activated without client approval'
-                )}
-              </p>
-            </div>
-          </div>
-
-          ${listItem(
-            'server',
-            t(
-              'الاستضافة',
-              'Hosting'
-            ),
-            t(
-              'تحدد حسب السعة والمرفقات والأداء قبل الشراء',
-              'Quoted before purchase based on capacity attachments and performance'
-            ),
-            B(
-              t(
-                'منفصلة',
-                'Separate'
-              ),
-              'neutral'
-            )
-          )}
-
-          ${listItem(
-            'mail',
-            t(
-              'البريد SMTP',
-              'SMTP email'
-            ),
-            t(
-              'للتفعيل والتنبيهات والتصعيد مع توضيح المزود والحدود والتجديد',
-              'For activation notifications and escalation with provider limits and renewal disclosed'
-            ),
-            B(
-              t(
-                'منفصلة',
-                'Separate'
-              ),
-              'neutral'
-            )
-          )}
-
-          ${listItem(
-            'hard-drive',
-            t(
-              'التخزين والنسخ',
-              'Storage & backup'
-            ),
-            t(
-              'يتأثر بحفظ الأصل أو المضغوط والفيديو وسياسة الاحتفاظ',
-              'Affected by original or compressed choice video and retention'
-            ),
-            B(
-              t(
-                'منفصلة',
-                'Separate'
-              ),
-              'neutral'
-            )
-          )}
-
-          ${listItem(
-            'chart-no-axes-combined',
-            t(
-              'التحليلات',
-              'Analytics'
-            ),
-            t(
-              'داخل النظام بدون Power BI أو اشتراك تحليل إضافي',
-              'Built in app without Power BI or extra analytics subscription'
-            ),
-            B(
-              t(
-                'بدون اشتراك BI',
-                'No BI subscription'
-              ),
-              'success'
-            )
-          )}
-        </div>
-
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'التسليم النهائي',
-                  'Final handover'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'ملكية كاملة وقابلية للتطوير مستقبلًا',
-                  'Full ownership and future maintainability'
-                )}
-              </p>
-            </div>
-          </div>
-
-          ${listItem(
-            'code-2',
-            t(
-              'الكود المصدري كاملًا',
-              'Full source code'
-            ),
-            t(
-              'المستودع تحت ملكية العميل',
-              'Repository under client ownership'
-            ),
-            B(
-              t(
-                'مشمول',
-                'Included'
-              ),
-              'success'
-            )
-          )}
-
-          ${listItem(
-            'database',
-            t(
-              'قاعدة البيانات',
-              'Database'
-            ),
-            t(
-              'المخطط والنسخة النهائية',
-              'Schema and final database'
-            ),
-            B(
-              t(
-                'مشمول',
-                'Included'
-              ),
-              'success'
-            )
-          )}
-
-          ${listItem(
-            'key-round',
-            t(
-              'حساب إدارة كامل',
-              'Full admin account'
-            ),
-            t(
-              'الخدمات والحسابات باسم العميل',
-              'Services and accounts owned by client'
-            ),
-            B(
-              t(
-                'مشمول',
-                'Included'
-              ),
-              'success'
-            )
-          )}
-
-          ${listItem(
-            'book-open-check',
-            t(
-              'تعليمات التشغيل والنسخ والاستعادة',
-              'Run backup & restore instructions'
-            ),
-            t(
-              'مع تجربة استعادة فعلية قبل الاستلام',
-              'Including real restore test before final acceptance'
-            ),
-            B(
-              t(
-                'مشمول',
-                'Included'
-              ),
-              'success'
-            )
-          )}
-        </div>
-      </div>
-
-      <div
-        class="sensitive"
-        style="margin-top:14px"
-      >
-        ${I('badge-check')}
-
-        <div>
-          <b>
-            ${t(
-              'شرط الإغلاق النهائي',
-              'Final completion rule'
-            )}
-          </b>
-
-          <p>
-            ${t(
-              'لا يعتبر المشروع مكتملًا أو مغلقًا إلا بعد تنفيذ النطاق المتفق عليه ومعالجة الملاحظات المتعلقة به وإعادة اختبارها واعتماد العميل النهائي كتابة',
-              'Project is not complete or closed until agreed scope is implemented in scope issues are fixed and retested and final written acceptance is received'
-            )}
-          </p>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function demoGuide() {
-  const coverage = [
+function submitInspection() {
+  toast(
     t(
-      'جدولة من إدارة الجودة مع توافر المفتشين ومنع التعارض',
-      'Quality-only scheduling with inspector availability and conflict prevention'
-    ),
-
-    t(
-      'تصنيف الملاحظات فوري ومحدد المدة وطويل المدى',
-      'Immediate time-bound and long-term finding classes'
-    ),
-
-    t(
-      'تصعيد 3 و6 و9 أيام ثم الإدارة العليا مع البريد',
-      '3 6 9 day escalation then Senior Management with email'
-    ),
-
-    t(
-      'تقييم المشروع من 100 بالخصومات مع مقارنة معادلة المطابقة',
-      '100-point project score with deduction model comparison'
-    ),
-
-    t(
-      'تحليلات الملاحظات للموظفين ومدة الإغلاق والشكاوى والعقود',
-      'Analytics for findings per employee closure time complaints and contracts'
-    ),
-
-    t(
-      'المفتش بلا نتائج أو تحليلات ومدير المشروع داخل مشروعه فقط',
-      'Inspector without results or analytics and Project Manager scoped to own project'
-    ),
-
-    t(
-      'PDF ببيانات القرار وتنزيل المعتمد حسب الصلاحية',
-      'PDF with decision data and permission based approved download'
-    ),
-
-    t(
-      'التعهد إلزامي حتى للحسابات التي تنشئها الإدارة',
-      'Mandatory undertaking for admin-created accounts'
-    ),
-
-    t(
-      'البلاغات الحساسة بصلاحية مستقلة يمنحها المالك فقط',
-      'Sensitive access independently granted by owner only'
-    ),
-
-    t(
-      'خطة تنفيذ ودعم وتشغيل وتسليم كاملة',
-      'Complete implementation support operations and handover plan'
+      "تم إرسال التفتيش للمراجعة وتثبيت إصدار النموذج والنتيجة داخليًا",
+      "Inspection submitted and form version plus calculated result were frozen internally"
     )
-  ];
-
-  return `
-    <div class="view">
-      ${toolbar(
-        'دليل الديمو ونطاق العرض',
-        'Demo Guide & Presentation Scope',
-        'النسخة الحالية ببيانات وهمية وتوضح التدفقات بينما الوظائف الخلفية الحقيقية تنفذ في Laravel وMySQL',
-        'Current build uses mock data to demonstrate workflows while production backend functions are implemented in Laravel and MySQL',
-        ''
-      )}
-
-      <div class="grid2">
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'سيناريو العرض المقترح',
-                  'Recommended walkthrough'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'يمر على آخر نقاط العميل بالترتيب',
-                  'Covers the client latest requirements in sequence'
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div class="timeline">
-            <div class="tl">
-              <b>
-                1 ·
-                ${t(
-                  'إدارة الجودة وجدولة المفتشين',
-                  'Quality Management & inspector scheduling'
-                )}
-              </b>
-
-              <p>
-                ${t(
-                  'اختر 8 أكتوبر الساعة 10 وشاهد المتاح والمشغول',
-                  'Choose 8 Oct at 10:00 and review available and busy inspectors'
-                )}
-              </p>
-            </div>
-
-            <div class="tl">
-              <b>
-                2 ·
-                ${t(
-                  'المفتش والتفتيش',
-                  'Inspector & inspection'
-                )}
-              </b>
-
-              <p>
-                ${t(
-                  'لاحظ إخفاء النتائج والتحليلات مع السماح بالمسودة والأدلة والاستكمال',
-                  'Verify results and analytics are hidden while drafts evidence and returned work are allowed'
-                )}
-              </p>
-            </div>
-
-            <div class="tl">
-              <b>
-                3 ·
-                ${t(
-                  'الملاحظات والتصعيد',
-                  'Findings & escalation'
-                )}
-              </b>
-
-              <p>
-                ${t(
-                  'صنف الملاحظة وشاهد الأصفر والبرتقالي والأحمر والإدارة العليا',
-                  'Classify a finding and review yellow orange red and senior escalation'
-                )}
-              </p>
-            </div>
-
-            <div class="tl">
-              <b>
-                4 ·
-                ${t(
-                  'معادلة التقييم',
-                  'Scoring model'
-                )}
-              </b>
-
-              <p>
-                ${t(
-                  'قارن نسبة المطابقة مع نموذج الخصم من 100',
-                  'Compare visit compliance with the 100 point deduction model'
-                )}
-              </p>
-            </div>
-
-            <div class="tl">
-              <b>
-                5 ·
-                ${t(
-                  'التحليلات والتقارير',
-                  'Analytics & reports'
-                )}
-              </b>
-
-              <p>
-                ${t(
-                  'راجع النسب ومدة الإغلاق والشكاوى والعقود ثم افتح PDF',
-                  'Review ratios closure time complaints contracts then open PDF'
-                )}
-              </p>
-            </div>
-
-            <div class="tl">
-              <b>
-                6 ·
-                ${t(
-                  'التعهد والبلاغات والتسليم',
-                  'Undertaking sensitive reports & handover'
-                )}
-              </b>
-
-              <p>
-                ${t(
-                  'اختبر الحساب المنشأ إداريًا ثم صلاحية البلاغات وخطة التسليم',
-                  'Test admin-created account undertaking sensitive access and delivery plan'
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="cardHead">
-            <div>
-              <h3 class="cardTitle">
-                ${t(
-                  'حقيقة الديمو',
-                  'Demo truthfulness'
-                )}
-              </h3>
-
-              <p class="sub">
-                ${t(
-                  'ما هو محاكاة وما هو إنتاج فعلي لاحقًا',
-                  'What is simulated versus production implementation'
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div class="sensitive">
-            ${I('flask-conical')}
-
-            <div>
-              <b>
-                ${t(
-                  'واجهة تفاعلية ببيانات وهمية',
-                  'Interactive mock data interface'
-                )}
-              </b>
-
-              <p>
-                ${t(
-                  'البريد الحقيقي ومنع الروابط المباشرة والتشفير والتخزين الخاص والنسخ والاستعادة وPDF الحقيقي كلها تحتاج Backend وخدمات فعلية',
-                  'Real email direct-link enforcement encryption private storage backup restore and server PDF require backend and production services'
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div
-        class="card"
-        style="margin-top:14px"
-      >
-        <div class="cardHead">
-          <div>
-            <h3 class="cardTitle">
-              ${t(
-                'تغطية آخر المتطلبات',
-                'Latest requirements coverage'
-              )}
-            </h3>
-
-            <p class="sub">
-              ${t(
-                'كل نقطة لها شاشة أو تدفق واضح داخل الديمو',
-                'Every point has a visible screen or workflow'
-              )}
-            </p>
-          </div>
-        </div>
-
-        <div class="grid2">
-          ${coverage
-            .map(
-              (
-                item,
-                index
-              ) => {
-                return `
-                  <div class="version">
-                    <div class="vno">
-                      ${String(
-                        index + 1
-                      ).padStart(
-                        2,
-                        '0'
-                      )}
-                    </div>
-
-                    <div class="vmain">
-                      <b>
-                        ${item}
-                      </b>
-
-                      <span>
-                        ${t(
-                          'ممثل في الديمو',
-                          'Represented in demo'
-                        )}
-                      </span>
-                    </div>
-
-                    ${B(
-                      t(
-                        'مغطى',
-                        'Covered'
-                      ),
-                      'success'
-                    )}
-                  </div>
-                `;
-              }
-            )
-            .join('')}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function render() {
-  const views = {
-    dashboard,
-    projects: projectView,
-    schedule,
-    inspection,
-    review,
-    forms,
-    guards,
-    actions,
-    training,
-    confidential,
-    reports,
-    analytics,
-    score_model: scoreModel,
-    registration,
-    users,
-    permission_test: permissionTest,
-    attachment_settings: attachmentSettings,
-    audit,
-    backup,
-    delivery_plan: deliveryPlan,
-    demo_guide: demoGuide
-  };
-
-  if (!views[S.view]) {
-    S.view = 'dashboard';
-  }
-
-  const content =
-    document.querySelector(
-      '#content'
-    );
-
-  if (content) {
-    content.innerHTML =
-      views[S.view]();
-  }
-
-  const title =
-    document.querySelector(
-      '#title'
-    );
-
-  if (title) {
-    title.textContent =
-      currentTitle();
-  }
-
-  setupNav();
-  updateStatic();
-  icons();
-
-  if (
-    S.view === 'registration'
-  ) {
-    initSignature();
-  }
-}
-
-function modal(html) {
-  const body =
-    document.querySelector(
-      '#modalBody'
-    );
-
-  const overlay =
-    document.querySelector(
-      '#modal'
-    );
-
-  if (!body || !overlay) {
-    return;
-  }
-
-  body.innerHTML = html;
-
-  overlay.classList.remove(
-    'hidden'
   );
 
-  icons();
+  setTimeout(
+    () => {
+      go(
+        state.role ===
+          "inspector"
+          ? "my_reports"
+          : "review"
+      );
+    },
+    700
+  );
 }
 
-function closeModal() {
-  const overlay =
-    document.querySelector(
-      '#modal'
-    );
-
-  if (overlay) {
-    overlay.classList.add(
-      'hidden'
-    );
-  }
-}
-
-function projectModal() {
+function guardEvaluationModal() {
   modal(`
     <h2>
       ${t(
-        'إضافة مشروع',
-        'Add Project'
+        "تقييم الحارس",
+        "Guard Evaluation"
       )}
     </h2>
 
-    <div
-      class="formGrid"
-      style="margin-top:14px"
+    <p
+      style="
+        color:var(--muted);
+        font-size:9px
+      "
     >
-      <div class="field">
-        <label>
-          ${t(
-            'الاسم بالعربية',
-            'Arabic name'
-          )}
-        </label>
+      ${t(
+        "محمد العتيبي · EMP-1042 · مرتبط بالزيارة VIS-2026-000123",
+        "Mohammed Al Otaibi · EMP-1042 · linked to VIS-2026-000123"
+      )}
+    </p>
 
-        <input class="input">
-      </div>
+    <div class="formGrid">
 
       <div class="field">
         <label>
           ${t(
-            'الاسم بالإنجليزية',
-            'English name'
-          )}
-        </label>
-
-        <input class="input">
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'الرمز',
-            'Code'
-          )}
-        </label>
-
-        <input
-          class="input"
-          placeholder="PR-001"
-        >
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'المنطقة',
-            'Region'
-          )}
-        </label>
-
-        <input class="input">
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'عدد الموظفين',
-            'Employee count'
+            "الانضباط",
+            "Discipline"
           )}
         </label>
 
         <input
           class="input"
           type="number"
-        >
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'تاريخ انتهاء العقد',
-            'Contract expiry'
-          )}
-        </label>
-
-        <input
-          class="input"
-          type="date"
-        >
-      </div>
-    </div>
-
-    <button
-      class="btn primary"
-      style="margin-top:12px"
-      onclick="
-        toast(
-          t(
-            'تمت إضافة مشروع تجريبي',
-            'Demo project added'
-          )
-        );
-        closeModal()
-      "
-    >
-      ${t(
-        'حفظ',
-        'Save'
-      )}
-    </button>
-  `);
-}
-
-function openProject(id) {
-  const project =
-    projects.find(
-      item =>
-        item.id === id
-    );
-
-  if (!project) {
-    return;
-  }
-
-  if (
-    S.role ===
-      'project_manager' &&
-    id !== 'P-001'
-  ) {
-    accessDenied();
-
-    return;
-  }
-
-  modal(`
-    <h2>
-      ${
-        S.lang === 'ar'
-          ? project.ar
-          : project.en
-      }
-    </h2>
-
-    <p class="sub">
-      ${project.code}
-      ·
-      ${
-        S.lang === 'ar'
-          ? project.regionAr
-          : project.regionEn
-      }
-    </p>
-
-    <div
-      class="kpis"
-      style="
-        grid-template-columns:
-          repeat(4,1fr);
-        margin-top:14px
-      "
-    >
-      <div class="kpi">
-        <b>
-          ${project.score}%
-        </b>
-
-        <span>
-          ${t(
-            'التقييم',
-            'Score'
-          )}
-        </span>
-      </div>
-
-      <div class="kpi">
-        <b>
-          ${project.visits}
-        </b>
-
-        <span>
-          ${t(
-            'الزيارات',
-            'Visits'
-          )}
-        </span>
-      </div>
-
-      <div class="kpi">
-        <b>
-          ${project.findings}
-        </b>
-
-        <span>
-          ${t(
-            'الملاحظات',
-            'Findings'
-          )}
-        </span>
-      </div>
-
-      <div class="kpi">
-        <b>
-          ${project.open}
-        </b>
-
-        <span>
-          ${t(
-            'إجراءات مفتوحة',
-            'Open actions'
-          )}
-        </span>
-      </div>
-    </div>
-
-    <button
-      class="btn secondary"
-      onclick="
-        closeModal();
-        go('analytics')
-      "
-    >
-      ${I('chart-column')}
-
-      ${t(
-        'فتح التحليل',
-        'Open analytics'
-      )}
-    </button>
-  `);
-}
-
-function visitModal() {
-  if (
-    S.role !== 'quality_admin'
-  ) {
-    toast(
-      t(
-        'جدولة الزيارات متاحة لإدارة الجودة فقط',
-        'Only Quality Management can schedule visits'
-      )
-    );
-
-    return;
-  }
-
-  S.selectedInspector = '';
-
-  modal(`
-    <h2>
-      ${t(
-        'جدولة زيارة جديدة',
-        'Schedule New Visit'
-      )}
-    </h2>
-
-    <p class="sub">
-      ${t(
-        'اختيار التاريخ والوقت يعرض كل المفتشين وحالتهم قبل الإسناد',
-        'Date and time selection shows all inspectors and availability before assignment'
-      )}
-    </p>
-
-    <div
-      class="formGrid"
-      style="margin-top:14px"
-    >
-      <div class="field">
-        <label>
-          ${t(
-            'المشروع',
-            'Project'
-          )}
-        </label>
-
-        <select class="select">
-          <option>
-            ${projectName(
-              'P-001'
-            )}
-          </option>
-
-          <option>
-            ${projectName(
-              'P-002'
-            )}
-          </option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'الموقع',
-            'Site'
-          )}
-        </label>
-
-        <select class="select">
-          <option>
-            ${t(
-              'البوابة الرئيسية',
-              'Main Gate'
-            )}
-          </option>
-
-          <option>
-            ${t(
-              'المبنى الإداري',
-              'Admin Building'
-            )}
-          </option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'التاريخ',
-            'Date'
-          )}
-        </label>
-
-        <input
-          id="visitDate"
-          class="input"
-          type="date"
-          value="2026-10-08"
-          onchange="updateAvailability()"
-        >
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'الوقت',
-            'Time'
-          )}
-        </label>
-
-        <input
-          id="visitTime"
-          class="input"
-          type="time"
-          value="10:00"
-          onchange="updateAvailability()"
-        >
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'نوع التفتيش',
-            'Inspection type'
-          )}
-        </label>
-
-        <select class="select">
-          <option>
-            ${t(
-              'دوري',
-              'Routine'
-            )}
-          </option>
-
-          <option>
-            ${t(
-              'مفاجئ',
-              'Surprise'
-            )}
-          </option>
-
-          <option>
-            ${t(
-              'متابعة',
-              'Follow-up'
-            )}
-          </option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'الوردية',
-            'Shift'
-          )}
-        </label>
-
-        <select class="select">
-          <option>
-            ${t(
-              'صباحية',
-              'Morning'
-            )}
-          </option>
-
-          <option>
-            ${t(
-              'مسائية',
-              'Evening'
-            )}
-          </option>
-        </select>
-      </div>
-    </div>
-
-    <div style="margin-top:15px">
-      <div class="cardHead">
-        <div>
-          <h3 class="cardTitle">
-            ${t(
-              'مفتشو الجودة',
-              'Quality Inspectors'
-            )}
-          </h3>
-
-          <p class="sub">
-            ${t(
-              'المفتش المشغول لا يمكن اختياره لنفس التوقيت',
-              'Busy inspector cannot be selected for the same time'
-            )}
-          </p>
-        </div>
-      </div>
-
-      <div
-        id="inspectorAvailability"
-        class="availabilityGrid"
-      >
-        ${availabilityCards()}
-      </div>
-    </div>
-
-    <div class="modalFooter">
-      <div class="policyHint">
-        ${I('shield-check')}
-
-        ${t(
-          'الإسناد يسجل اسم من قام به ويرسل إشعارًا للمفتش',
-          'Assignment logs the assigner and notifies the inspector'
-        )}
-      </div>
-
-      <button
-        class="btn primary"
-        onclick="saveScheduledVisit()"
-      >
-        ${t(
-          'حفظ وإسناد',
-          'Save & assign'
-        )}
-      </button>
-    </div>
-  `);
-}
-
-function saveScheduledVisit() {
-  if (!S.selectedInspector) {
-    toast(
-      t(
-        'اختاري مفتشًا متاحًا أولًا',
-        'Choose an available inspector first'
-      )
-    );
-
-    return;
-  }
-
-  const date =
-    document.querySelector(
-      '#visitDate'
-    )?.value || '';
-
-  const time =
-    document.querySelector(
-      '#visitTime'
-    )?.value || '';
-
-  const inspector =
-    inspectors.find(
-      item =>
-        item.id ===
-        S.selectedInspector
-    );
-
-  if (
-    inspectorStatus(
-      inspector,
-      date,
-      time
-    ).busy
-  ) {
-    toast(
-      t(
-        'يوجد تعارض في هذا الموعد',
-        'Scheduling conflict detected'
-      )
-    );
-
-    return;
-  }
-
-  toast(
-    t(
-      'تمت الجدولة من إدارة الجودة وإشعار المفتش',
-      'Visit scheduled by Quality Management and inspector notified'
-    )
-  );
-
-  closeModal();
-}
-
-function rescheduleModal() {
-  if (
-    S.role !== 'quality_admin'
-  ) {
-    toast(
-      t(
-        'إعادة الجدولة والإلغاء من إدارة الجودة فقط',
-        'Only Quality Management can reschedule or cancel'
-      )
-    );
-
-    return;
-  }
-
-  modal(`
-    <h2>
-      ${t(
-        'إعادة جدولة أو إلغاء زيارة',
-        'Reschedule or Cancel Visit'
-      )}
-    </h2>
-
-    <div class="field">
-      <label>
-        ${t(
-          'الإجراء',
-          'Action'
-        )}
-      </label>
-
-      <select class="select">
-        <option>
-          ${t(
-            'إعادة جدولة',
-            'Reschedule'
-          )}
-        </option>
-
-        <option>
-          ${t(
-            'إلغاء',
-            'Cancel'
-          )}
-        </option>
-      </select>
-    </div>
-
-    <div
-      class="field"
-      style="margin-top:10px"
-    >
-      <label>
-        ${t(
-          'السبب إلزامي',
-          'Reason is mandatory'
-        )}
-      </label>
-
-      <textarea
-        class="textarea"
-        placeholder="${t(
-          'اكتب سبب التغيير',
-          'Enter reason'
-        )}"
-      ></textarea>
-    </div>
-
-    <div
-      class="field"
-      style="margin-top:10px"
-    >
-      <label>
-        ${t(
-          'الموعد الجديد عند إعادة الجدولة',
-          'New date and time if rescheduled'
-        )}
-      </label>
-
-      <input
-        class="input"
-        type="datetime-local"
-      >
-    </div>
-
-    <div
-      class="sensitive"
-      style="margin-top:10px"
-    >
-      ${I('history')}
-
-      <div>
-        <b>
-          ${t(
-            'حفظ تاريخي كامل',
-            'Full history'
-          )}
-        </b>
-
-        <p>
-          ${t(
-            'يحفظ الموعد القديم والجديد والسبب واسم من قام بالتغيير',
-            'Old and new schedule reason and actor are retained'
-          )}
-        </p>
-      </div>
-    </div>
-
-    <button
-      class="btn primary"
-      style="margin-top:12px"
-      onclick="
-        toast(
-          t(
-            'تم تسجيل التغيير وإشعار المفتش',
-            'Change logged and inspector notified'
-          )
-        );
-        closeModal()
-      "
-    >
-      ${t(
-        'تأكيد',
-        'Confirm'
-      )}
-    </button>
-  `);
-}
-
-function answer(
-  id,
-  value
-) {
-  S.answers[id] =
-    value;
-
-  render();
-}
-
-function saveDraft() {
-  S.status = 'draft';
-
-  toast(
-    t(
-      'تم حفظ المسودة',
-      'Draft saved'
-    )
-  );
-}
-
-function submitInspection() {
-  S.status = 'submitted';
-  S.reviewState = 'pending';
-
-  toast(
-    t(
-      'تم إرسال التفتيش للمراجعة وتثبيت الإصدار والنتيجة داخليًا',
-      'Inspection submitted for review and version plus calculated result frozen internally'
-    )
-  );
-
-  render();
-}
-
-function fileDemo(input) {
-  const box =
-    document.querySelector(
-      '#fileList'
-    );
-
-  if (!box) {
-    return;
-  }
-
-  box.innerHTML =
-    [...input.files]
-      .map(file => {
-        let icon = 'file';
-
-        if (
-          file.type.startsWith(
-            'video'
-          )
-        ) {
-          icon = 'video';
-        }
-
-        if (
-          file.type.startsWith(
-            'image'
-          )
-        ) {
-          icon = 'image';
-        }
-
-        return listItem(
-          icon,
-          file.name,
-          `${(
-            file.size /
-            1024 /
-            1024
-          ).toFixed(2)} MB · ${t(
-            'رفع الآن',
-            'uploaded now'
-          )}`,
-          B(
-            t(
-              'تجريبي',
-              'Demo'
-            ),
-            'info'
-          )
-        );
-      })
-      .join('');
-
-  icons();
-}
-
-function guardEval() {
-  modal(`
-    <h2>
-      ${t(
-        'تقييم الحارس',
-        'Guard Evaluation'
-      )}
-    </h2>
-
-    <p class="sub">
-      ${t(
-        'محمد العتيبي · EMP-1042 · مرتبط بالزيارة VIS-2026-000123',
-        'Mohammed Al Otaibi · EMP-1042 · linked to VIS-2026-000123'
-      )}
-    </p>
-
-    <div
-      class="formGrid"
-      style="margin-top:14px"
-    >
-      <div class="field">
-        <label>
-          ${t(
-            'الانضباط',
-            'Discipline'
-          )}
-        </label>
-
-        <input
-          type="range"
-          min="0"
-          max="100"
           value="95"
         >
       </div>
@@ -8488,725 +4110,1888 @@ function guardEval() {
       <div class="field">
         <label>
           ${t(
-            'الالتزام بالإجراءات',
-            'Procedure compliance'
+            "اتباع الإجراءات",
+            "Procedure compliance"
           )}
         </label>
 
         <input
-          type="range"
-          min="0"
-          max="100"
+          class="input"
+          type="number"
           value="90"
         >
       </div>
 
       <div class="field span2">
+
         <label>
           ${t(
-            'ملاحظات مستقلة',
-            'Independent notes'
+            "الملاحظات",
+            "Notes"
           )}
         </label>
 
-        <textarea class="textarea">${t(
-          'التزام جيد مع ملاحظة بسيطة في تسليم الوردية',
-          'Good compliance with a minor shift-handover note'
+        <textarea class="input">${t(
+          "التزام جيد مع ملاحظة بسيطة في تسليم الوردية",
+          "Good compliance with a minor shift handover note"
         )}</textarea>
+
       </div>
+
     </div>
 
     <button
-      class="btn primary"
+      class="button primary"
       onclick="
         toast(
           t(
-            'تم حفظ تقييم الحارس وربطه بسجله',
-            'Guard evaluation saved and linked to record'
+            'تم حفظ تقييم الحارس',
+            'Guard evaluation saved'
           )
         );
         closeModal()
       "
     >
       ${t(
-        'حفظ التقييم',
-        'Save evaluation'
+        "حفظ التقييم",
+        "Save Evaluation"
       )}
     </button>
   `);
 }
 
-function decision(type) {
-  if (
-    type === 'approve'
-  ) {
-    S.reviewState =
-      'approved';
-
-    toast(
+function reviewPage() {
+  return `
+    ${pageIntro(
+      "REVIEW QUEUE",
       t(
-        'تم اعتماد التقرير وتثبيت بيانات المعتمد تاريخيًا',
-        'Report approved and decision-maker snapshot frozen'
+        "المراجعات والاعتمادات",
+        "Reviews & Approvals"
+      ),
+      t(
+        "لا يحتاج المراجع للبحث في النظام فكل التقارير التي تنتظر قراره موجودة هنا",
+        "The reviewer does not need to search the system because everything awaiting a decision is gathered here"
       )
-    );
+    )}
 
-    render();
+    ${routeStrip(2)}
 
-    return;
-  }
+    <div class="grid2">
 
+      <div class="card">
+
+        <div class="cardHead">
+
+          <div>
+            <h3>
+              REP-2026-000094
+            </h3>
+
+            <p>
+              ${projectName(
+                "P-001"
+              )}
+              ·
+              VIS-2026-000123
+            </p>
+          </div>
+
+          ${badge(
+            t(
+              "بانتظار المراجعة",
+              "Pending Review"
+            ),
+            "warning"
+          )}
+
+        </div>
+
+        <div class="statRow">
+
+          ${statBox(
+            "v2.4",
+            t(
+              "النموذج",
+              "Form"
+            )
+          )}
+
+          ${statBox(
+            "1",
+            t(
+              "ملاحظة",
+              "Finding"
+            )
+          )}
+
+          ${statBox(
+            "2",
+            t(
+              "مرفقات",
+              "Evidence"
+            )
+          )}
+
+          ${statBox(
+            "10:31",
+            t(
+              "وقت الإرسال",
+              "Submitted"
+            )
+          )}
+
+        </div>
+
+        <div class="heroActionRow">
+
+          <button
+            class="button"
+            onclick="returnReport()"
+          >
+            ${icon("undo-2")}
+            ${t(
+              "إعادة للاستكمال",
+              "Return"
+            )}
+          </button>
+
+          ${
+            state.role ===
+              "quality_admin"
+              ? `
+                <button
+                  class="button danger"
+                  onclick="rejectReport()"
+                >
+                  ${icon("ban")}
+                  ${t(
+                    "رفض",
+                    "Reject"
+                  )}
+                </button>
+
+                <button
+                  class="button primary"
+                  onclick="approveReport()"
+                >
+                  ${icon("badge-check")}
+                  ${t(
+                    "اعتماد",
+                    "Approve"
+                  )}
+                </button>
+              `
+              : ""
+          }
+
+        </div>
+
+      </div>
+
+      <div class="card">
+
+        <div class="cardHead">
+          <div>
+            <h3>
+              ${t(
+                "الأدلة",
+                "Evidence"
+              )}
+            </h3>
+
+            <p>
+              ${t(
+                "الأدلة المرتبطة بالملاحظة",
+                "Evidence linked to the finding"
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div class="list">
+
+          ${listItem(
+            "image",
+            "IMG-0041.jpg",
+            t(
+              "بوابة الطوارئ · 10:18",
+              "Emergency Gate · 10:18"
+            ),
+            badge(
+              t(
+                "صورة",
+                "Image"
+              ),
+              "info"
+            )
+          )}
+
+          ${listItem(
+            "video",
+            "VID-0022.mp4",
+            t(
+              "فيديو قصير · 00:34",
+              "Short video · 00:34"
+            ),
+            badge(
+              t(
+                "فيديو",
+                "Video"
+              ),
+              "info"
+            )
+          )}
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <section class="section">
+
+      <div class="card">
+
+        <div class="cardHead">
+          <div>
+            <h3>
+              ${t(
+                "السجل التاريخي",
+                "Decision History"
+              )}
+            </h3>
+
+            <p>
+              ${t(
+                "بيانات كل قرار تحفظ كما كانت وقت اتخاذه",
+                "Decision-maker data is frozen exactly as it was at decision time"
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div class="list">
+
+          ${listItem(
+            "send",
+            t(
+              "إرسال التقرير",
+              "Report submitted"
+            ),
+            t(
+              "خالد السالم · مفتش جودة · 10:31",
+              "Khaled Al Salem · Quality Inspector · 10:31"
+            )
+          )}
+
+          ${listItem(
+            "eye",
+            t(
+              "بدء المراجعة",
+              "Review started"
+            ),
+            t(
+              "سارة محمد · موظف جودة · 10:40",
+              "Sarah Mohammed · Quality Officer · 10:40"
+            )
+          )}
+
+        </div>
+
+      </div>
+
+    </section>
+  `;
+}
+
+function decisionReasonModal(
+  type
+) {
   modal(`
     <h2>
       ${
-        type === 'return'
+        type === "return"
           ? t(
-              'إعادة التقرير للاستكمال',
-              'Return for Completion'
+              "إعادة للاستكمال",
+              "Return for Completion"
             )
           : t(
-              'رفض التقرير',
-              'Reject Report'
+              "رفض التقرير",
+              "Reject Report"
             )
       }
     </h2>
 
     <div class="field">
+
       <label>
         ${t(
-          'السبب إلزامي',
-          'Reason is mandatory'
+          "السبب إلزامي",
+          "Reason is mandatory"
         )}
       </label>
 
       <textarea
         id="decisionReason"
-        class="textarea"
+        class="input"
+        placeholder="${t(
+          "اكتب سبب القرار",
+          "Enter decision reason"
+        )}"
       ></textarea>
+
     </div>
 
     <button
       class="
-        btn
+        button
         ${
-          type === 'return'
-            ? 'secondary'
-            : 'dangerBtn'
+          type === "return"
+            ? "primary"
+            : "danger"
         }
       "
-      style="margin-top:10px"
-      onclick="confirmDecision('${type}')"
+      onclick="
+        confirmDecision(
+          '${type}'
+        )
+      "
     >
       ${t(
-        'تأكيد القرار',
-        'Confirm decision'
+        "تأكيد القرار",
+        "Confirm Decision"
       )}
     </button>
   `);
 }
 
-function confirmDecision(type) {
+function returnReport() {
+  decisionReasonModal(
+    "return"
+  );
+}
+
+function rejectReport() {
+  decisionReasonModal(
+    "reject"
+  );
+}
+
+function confirmDecision(
+  type
+) {
   const reason =
     document.querySelector(
-      '#decisionReason'
+      "#decisionReason"
     )?.value.trim();
 
   if (!reason) {
     toast(
       t(
-        'اكتب سبب القرار أولًا',
-        'Enter a reason first'
+        "اكتب سبب القرار أولًا",
+        "Enter the reason first"
       )
     );
 
     return;
   }
 
-  S.reviewState =
-    type === 'return'
-      ? 'returned'
-      : 'rejected';
-
   toast(
-    type === 'return'
+    type === "return"
       ? t(
-          'تمت الإعادة للمفتش مع السبب',
-          'Returned to inspector with reason'
+          "تمت إعادة التقرير للمفتش",
+          "Report returned to inspector"
         )
       : t(
-          'تم رفض التقرير مع السبب',
-          'Report rejected with reason'
+          "تم رفض التقرير",
+          "Report rejected"
         )
   );
 
   closeModal();
-  render();
 }
 
-function formBuilder() {
+function approveReport() {
   modal(`
     <h2>
       ${t(
-        'منشئ النماذج',
-        'Form Builder'
+        "تم اعتماد التقرير",
+        "Report Approved"
       )}
     </h2>
 
-    <p class="sub">
-      ${t(
-        'إضافة نماذج مستقبلًا من داخل النظام بدون تعديل الكود',
-        'Future forms can be created from the system without code changes'
-      )}
-    </p>
+    <div class="permissionNotice">
 
-    <div
-      class="formGrid"
-      style="margin-top:14px"
-    >
-      <div class="field">
-        <label>
-          ${t(
-            'اسم عربي',
-            'Arabic name'
-          )}
-        </label>
+      ${icon("badge-check")}
 
-        <input
-          class="input"
-          value="تفتيش أمني شامل"
-        >
-      </div>
+      <span>
+        ${t(
+          "سيتم حفظ اسم المعتمد ومسمّاه الوظيفي وتاريخ ووقت القرار داخل التقرير بصورة تاريخية",
+          "Approver name job title date and decision time will be frozen in the report history"
+        )}
+      </span>
 
-      <div class="field">
-        <label>
-          English name
-        </label>
-
-        <input
-          class="input"
-          value="Comprehensive Security Inspection"
-        >
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'نوع التفتيش',
-            'Inspection type'
-          )}
-        </label>
-
-        <select class="select">
-          <option>
-            ${t(
-              'دوري',
-              'Routine'
-            )}
-          </option>
-
-          <option>
-            ${t(
-              'مفاجئ',
-              'Surprise'
-            )}
-          </option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'المشروع',
-            'Project'
-          )}
-        </label>
-
-        <select class="select">
-          <option>
-            ${t(
-              'كل المشاريع',
-              'All projects'
-            )}
-          </option>
-        </select>
-      </div>
     </div>
 
     <div
-      class="question"
-      style="margin-top:12px"
+      class="statRow"
+      style="margin-top:14px"
     >
-      <div class="qHead">
-        <div>
-          <h4>
-            ${t(
-              'بند جديد',
-              'New item'
+
+      ${statBox(
+        t(
+          "نورة العتيبي",
+          "Noura Al Otaibi"
+        ),
+        t(
+          "المعتمد",
+          "Approver"
+        )
+      )}
+
+      ${statBox(
+        t(
+          "مديرة الجودة",
+          "Quality Manager"
+        ),
+        t(
+          "المسمى",
+          "Title"
+        )
+      )}
+
+      ${statBox(
+        "10:46",
+        t(
+          "الوقت",
+          "Time"
+        )
+      )}
+
+      ${statBox(
+        "04 Oct",
+        t(
+          "التاريخ",
+          "Date"
+        )
+      )}
+
+    </div>
+
+    <button
+      class="button primary"
+      style="margin-top:14px"
+      onclick="
+        toast(
+          t(
+            'تم حفظ الاعتماد وإشعار المفتش',
+            'Approval saved and inspector notified'
+          )
+        );
+        closeModal()
+      "
+    >
+      ${t(
+        "تم",
+        "Done"
+      )}
+    </button>
+  `);
+}
+
+function actionsPage() {
+  return `
+    ${pageIntro(
+      "FINDINGS & ACTIONS",
+      t(
+        "الملاحظات والإجراءات التصحيحية",
+        "Findings & Corrective Actions"
+      ),
+      t(
+        "الملاحظة تبدأ من بند غير مطابق ثم تتحول لمسار معالجة واضح حتى الإغلاق أو التصعيد",
+        "A finding starts from a non-compliant item and follows a clear treatment path through closure or escalation"
+      )
+    )}
+
+    ${routeStrip(3)}
+
+    <div class="escalationPath">
+
+      <div class="escalationStage yellow">
+        <span>3</span>
+        <b>
+          ${t(
+            "تصعيد أصفر",
+            "Yellow Escalation"
+          )}
+        </b>
+        <small>
+          ${t(
+            "إشعار وبريد للمسؤول وإدارة المشروع",
+            "Notification and email to owner and Project Management"
+          )}
+        </small>
+      </div>
+
+      <div class="escalationStage orange">
+        <span>6</span>
+        <b>
+          ${t(
+            "تصعيد برتقالي",
+            "Orange Escalation"
+          )}
+        </b>
+        <small>
+          ${t(
+            "بريد متابعة جديد وزيادة مستوى التنبيه",
+            "Follow-up email and increased alert level"
+          )}
+        </small>
+      </div>
+
+      <div class="escalationStage red">
+        <span>9</span>
+        <b>
+          ${t(
+            "تصعيد أحمر",
+            "Red Escalation"
+          )}
+        </b>
+        <small>
+          ${t(
+            "تصعيد شديد مع إشعار جديد",
+            "Critical escalation with a new alert"
+          )}
+        </small>
+      </div>
+
+      <div class="escalationStage senior">
+        <span>
+          ${icon("building-2")}
+        </span>
+        <b>
+          ${t(
+            "الإدارة العليا",
+            "Senior Management"
+          )}
+        </b>
+        <small>
+          ${t(
+            "التصعيد النهائي بعد المرحلة الحمراء",
+            "Final escalation after the red stage"
+          )}
+        </small>
+      </div>
+
+    </div>
+
+    <section class="section">
+
+      <div class="permissionNotice">
+
+        ${icon("calendar-clock")}
+
+        <span>
+          ${t(
+            "في الديمو يبدأ العد من تسجيل الملاحظة وبأيام تقويمية وهذا القرار سيُثبت نهائيًا قبل التنفيذ هل يكون من تاريخ التسجيل أو الاستحقاق وهل هي أيام عمل أو أيام تقويمية",
+            "The demo currently counts from finding creation using calendar days. Final production rules will be approved before implementation"
+          )}
+        </span>
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="card">
+
+        <div class="tableWrap">
+
+          <table>
+
+            <thead>
+              <tr>
+                <th>المرجع</th>
+                <th>الملاحظة</th>
+                <th>التصنيف</th>
+                <th>الخطورة</th>
+                <th>العمر</th>
+                <th>التصعيد</th>
+                <th>الحالة</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody>
+
+              <tr>
+                <td>CAPA-2026-0041</td>
+                <td>${t("بوابة الطوارئ","Emergency gate")}</td>
+                <td>${t("حالة فورية","Immediate")}</td>
+                <td>${badge(t("حرجة","Critical"),"danger")}</td>
+                <td>10 ${t("أيام","days")}</td>
+                <td>${badge(t("أحمر","Red"),"danger")}</td>
+                <td>${badge(t("متأخر","Overdue"),"danger")}</td>
+                <td>
+                  <button
+                    class="button"
+                    onclick="actionDetails()"
+                  >
+                    ${t(
+                      "فتح",
+                      "Open"
+                    )}
+                  </button>
+                </td>
+              </tr>
+
+              <tr>
+                <td>CAPA-2026-0044</td>
+                <td>${t("سجل الزوار","Visitor log")}</td>
+                <td>${t("مدة محددة","Time-bound")}</td>
+                <td>${badge(t("متوسطة","Medium"),"info")}</td>
+                <td>4 ${t("أيام","days")}</td>
+                <td>${badge(t("أصفر","Yellow"),"warning")}</td>
+                <td>${badge(t("قيد المعالجة","In Progress"),"info")}</td>
+                <td>
+                  <button
+                    class="button"
+                    onclick="actionDetails()"
+                  >
+                    ${t(
+                      "فتح",
+                      "Open"
+                    )}
+                  </button>
+                </td>
+              </tr>
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </div>
+
+    </section>
+  `;
+}
+
+function actionDetails() {
+  modal(`
+    <h2>
+      CAPA-2026-0041
+    </h2>
+
+    ${routeStrip(4)}
+
+    <div class="statRow">
+
+      ${statBox(
+        t(
+          "حرجة",
+          "Critical"
+        ),
+        t(
+          "الخطورة",
+          "Severity"
+        )
+      )}
+
+      ${statBox(
+        "9",
+        t(
+          "أيام",
+          "Days"
+        )
+      )}
+
+      ${statBox(
+        t(
+          "أحمر",
+          "Red"
+        ),
+        t(
+          "التصعيد",
+          "Escalation"
+        )
+      )}
+
+      ${statBox(
+        t(
+          "متأخر",
+          "Overdue"
+        ),
+        t(
+          "الحالة",
+          "Status"
+        )
+      )}
+
+    </div>
+
+    <div
+      class="list"
+      style="margin-top:14px"
+    >
+
+      ${listItem(
+        "triangle-alert",
+        t(
+          "تسجيل الملاحظة",
+          "Finding registered"
+        ),
+        "04 Oct · 10:21"
+      )}
+
+      ${listItem(
+        "user-round",
+        t(
+          "إسناد المعالجة",
+          "Treatment assigned"
+        ),
+        t(
+          "إدارة المشروع",
+          "Project Management"
+        )
+      )}
+
+      ${listItem(
+        "mail",
+        t(
+          "إرسال بريد التصعيد",
+          "Escalation email sent"
+        ),
+        t(
+          "مرحلة 3 و6 و9 أيام",
+          "Day 3 6 and 9 stages"
+        )
+      )}
+
+      ${listItem(
+        "cloud-upload",
+        t(
+          "رفع دليل المعالجة",
+          "Treatment evidence uploaded"
+        ),
+        t(
+          "بانتظار مراجعة الجودة",
+          "Awaiting Quality review"
+        )
+      )}
+
+    </div>
+  `);
+}
+
+function analyticsPage() {
+  const visibleProjects =
+    state.role ===
+      "project_manager"
+      ? projects.filter(
+          p => p.id ===
+            "P-001"
+        )
+      : projects;
+
+  const totalEmployees =
+    visibleProjects.reduce(
+      (
+        total,
+        p
+      ) =>
+        total +
+        p.employees,
+      0
+    );
+
+  const totalFindings =
+    visibleProjects.reduce(
+      (
+        total,
+        p
+      ) =>
+        total +
+        p.findings,
+      0
+    );
+
+  const ratio =
+    (
+      totalFindings /
+      totalEmployees *
+      100
+    ).toFixed(1);
+
+  return `
+    ${pageIntro(
+      "INTERNAL ANALYTICS",
+      t(
+        "التحليلات داخل النظام",
+        "In-app Analytics"
+      ),
+      t(
+        "بدون Power BI أو اشتراك تحليل إضافي",
+        "No Power BI or additional analytics subscription"
+      )
+    )}
+
+    <div class="metricGrid">
+
+      ${statBox(
+        "88%",
+        t(
+          "متوسط الالتزام",
+          "Average compliance"
+        )
+      )}
+
+      ${statBox(
+        ratio + "%",
+        t(
+          "الملاحظات إلى الموظفين",
+          "Findings / employees"
+        )
+      )}
+
+      ${statBox(
+        "4.5",
+        t(
+          "متوسط أيام الإغلاق",
+          "Average closure days"
+        )
+      )}
+
+      ${statBox(
+        "7",
+        t(
+          "الشكاوى",
+          "Complaints"
+        )
+      )}
+
+      ${statBox(
+        "17",
+        t(
+          "يوم لأقرب عقد",
+          "days to nearest contract"
+        )
+      )}
+
+    </div>
+
+    <section class="section">
+
+      <div class="grid2">
+
+        <div class="card">
+
+          <div class="cardHead">
+
+            <div>
+              <h3>
+                ${t(
+                  "اتجاه التحسن",
+                  "Improvement Trend"
+                )}
+              </h3>
+
+              <p>
+                ${t(
+                  "يومي وأسبوعي وشهري وسنوي",
+                  "Daily weekly monthly and yearly"
+                )}
+              </p>
+            </div>
+
+          </div>
+
+          <div class="chartBox">
+
+            ${[
+              63,
+              69,
+              74,
+              78,
+              85,
+              92
+            ]
+              .map(
+                (
+                  value,
+                  index
+                ) => {
+                  const ar =
+                    [
+                      "مايو",
+                      "يونيو",
+                      "يوليو",
+                      "أغسطس",
+                      "سبتمبر",
+                      "أكتوبر"
+                    ];
+
+                  const en =
+                    [
+                      "May",
+                      "Jun",
+                      "Jul",
+                      "Aug",
+                      "Sep",
+                      "Oct"
+                    ];
+
+                  return `
+                    <div class="chartColumn">
+
+                      <div
+                        class="
+                          chartBar
+                          ${
+                            index === 5
+                              ? "gold"
+                              : ""
+                          }
+                        "
+                        style="
+                          height:${value}%
+                        "
+                      ></div>
+
+                      <span>
+                        ${t(
+                          ar[index],
+                          en[index]
+                        )}
+                      </span>
+
+                    </div>
+                  `;
+                }
+              )
+              .join("")}
+
+          </div>
+
+        </div>
+
+        <div class="card">
+
+          <div class="cardHead">
+
+            <div>
+              <h3>
+                ${t(
+                  "المؤشرات التشغيلية",
+                  "Operational Metrics"
+                )}
+              </h3>
+
+            </div>
+
+          </div>
+
+          <div class="list">
+
+            ${listItem(
+              "timer",
+              t(
+                "متوسط مدة إغلاق الحالات",
+                "Average closure time"
+              ),
+              "4.5 " +
+                t(
+                  "يوم",
+                  "days"
+                ),
+              badge(
+                "-0.8",
+                "success"
+              )
             )}
-          </h4>
+
+            ${listItem(
+              "users",
+              t(
+                "الملاحظات لكل 100 موظف",
+                "Findings per 100 employees"
+              ),
+              ratio + "%",
+              badge(
+                t(
+                  "متابعة",
+                  "Monitor"
+                ),
+                "info"
+              )
+            )}
+
+            ${listItem(
+              "message-square-warning",
+              t(
+                "الشكاوى",
+                "Complaints"
+              ),
+              "7",
+              badge(
+                "-2",
+                "success"
+              )
+            )}
+
+            ${listItem(
+              "calendar-clock",
+              t(
+                "قرب انتهاء العقود",
+                "Contract expiry"
+              ),
+              t(
+                "مشروع بوابة النخيل · 17 يوم",
+                "Palm Gate · 17 days"
+              ),
+              badge(
+                t(
+                  "قريب",
+                  "Soon"
+                ),
+                "danger"
+              )
+            )}
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="card">
+
+        <div class="cardHead">
+
+          <div>
+            <h3>
+              ${t(
+                "ترتيب المشاريع",
+                "Project Ranking"
+              )}
+            </h3>
+
+            <p>
+              ${t(
+                "حسب الملاحظات والتحسن والشكاوى والمدة",
+                "By findings improvement complaints and closure time"
+              )}
+            </p>
+          </div>
+
+        </div>
+
+        <div class="tableWrap">
+
+          <table>
+
+            <thead>
+              <tr>
+                <th>المشروع</th>
+                <th>التقييم</th>
+                <th>الملاحظات</th>
+                <th>النسبة للموظفين</th>
+                <th>مدة الإغلاق</th>
+                <th>التحسن</th>
+                <th>الشكاوى</th>
+                <th>العقد</th>
+              </tr>
+            </thead>
+
+            <tbody>
+
+              ${visibleProjects
+                .map(p => {
+                  return `
+                    <tr>
+
+                      <td>
+                        ${
+                          state.lang ===
+                          "ar"
+                            ? p.ar
+                            : p.en
+                        }
+                      </td>
+
+                      <td>
+                        ${p.score}/100
+                      </td>
+
+                      <td>
+                        ${p.findings}
+                      </td>
+
+                      <td>
+                        ${(
+                          p.findings /
+                          p.employees *
+                          100
+                        ).toFixed(1)}%
+                      </td>
+
+                      <td>
+                        ${p.closeDays}
+                        ${t(
+                          "يوم",
+                          "days"
+                        )}
+                      </td>
+
+                      <td>
+                        +${p.improvement}%
+                      </td>
+
+                      <td>
+                        ${p.complaints}
+                      </td>
+
+                      <td>
+                        ${badge(
+                          p.contractDays +
+                            " " +
+                            t(
+                              "يوم",
+                              "days"
+                            ),
+                          p.contractDays <
+                            30
+                            ? "danger"
+                            : "warning"
+                        )}
+                      </td>
+
+                    </tr>
+                  `;
+                })
+                .join("")}
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </div>
+
+    </section>
+  `;
+}
+
+function reportsPage() {
+  return `
+    ${pageIntro(
+      "REPORTS",
+      t(
+        "التقارير",
+        "Reports"
+      ),
+      t(
+        "التقرير هو نتيجة الزيارة الرسمية ويحتوي على كل القرارات والأدلة والملاحظات المرتبطة بها",
+        "The report is the official visit output containing decisions evidence and related findings"
+      )
+    )}
+
+    ${routeStrip(2)}
+
+    <div class="card">
+
+      <div class="tableWrap">
+
+        <table>
+
+          <thead>
+            <tr>
+              <th>التقرير</th>
+              <th>المشروع</th>
+              <th>الزيارة</th>
+              <th>الحالة</th>
+              <th>المعتمد</th>
+              <th>التاريخ</th>
+              <th></th>
+            </tr>
+          </thead>
+
+          <tbody>
+
+            <tr>
+              <td>REP-2026-000094</td>
+              <td>${projectName("P-001")}</td>
+              <td>VIS-2026-000123</td>
+              <td>${badge(t("معتمد","Approved"),"success")}</td>
+              <td>${t("نورة العتيبي","Noura Al Otaibi")}</td>
+              <td>04 Oct</td>
+              <td>
+                <button
+                  class="button"
+                  onclick="reportPreview()"
+                >
+                  ${t(
+                    "فتح",
+                    "Open"
+                  )}
+                </button>
+              </td>
+            </tr>
+
+            ${
+              state.role !==
+                "project_manager"
+                ? `
+                  <tr>
+                    <td>REP-2026-000091</td>
+                    <td>${projectName("P-002")}</td>
+                    <td>VIS-2026-000119</td>
+                    <td>${badge(t("بانتظار المراجعة","Pending Review"),"warning")}</td>
+                    <td>—</td>
+                    <td>02 Oct</td>
+                    <td>
+                      <button
+                        class="button"
+                        onclick="reportPreview()"
+                      >
+                        ${t(
+                          "فتح",
+                          "Open"
+                        )}
+                      </button>
+                    </td>
+                  </tr>
+                `
+                : ""
+            }
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    </div>
+  `;
+}
+
+function myReportsPage() {
+  return `
+    ${pageIntro(
+      "MY REPORTS",
+      t(
+        "تقاريري",
+        "My Reports"
+      ),
+      t(
+        "يعرض المفتش تقارير الزيارات التي نفذها هو فقط دون نتائج المشاريع العامة",
+        "Inspectors see only reports from their own assigned visits without project-wide analytics"
+      )
+    )}
+
+    <div class="card">
+
+      <div class="list">
+
+        ${listItem(
+          "file-check-2",
+          "REP-2026-000094",
+          t(
+            "زيارة VIS-000123 · معتمد",
+            "VIS-000123 · Approved"
+          ),
+          `
+            <button
+              class="button"
+              onclick="reportPreview()"
+            >
+              ${t(
+                "فتح",
+                "Open"
+              )}
+            </button>
+          `
+        )}
+
+        ${listItem(
+          "undo-2",
+          "REP-2026-000089",
+          t(
+            "زيارة VIS-000115 · معاد للاستكمال",
+            "VIS-000115 · Returned"
+          ),
+          `
+            <button
+              class="button"
+              onclick="go('returned')"
+            >
+              ${t(
+                "استكمال",
+                "Complete"
+              )}
+            </button>
+          `
+        )}
+
+      </div>
+
+    </div>
+  `;
+}
+
+function reportPreview() {
+  modal(`
+    <h2>
+      REP-2026-000094
+    </h2>
+
+    ${routeStrip(2)}
+
+    <div class="statRow">
+
+      ${statBox(
+        "92/100",
+        t(
+          "تقييم المشروع",
+          "Project score"
+        )
+      )}
+
+      ${statBox(
+        t(
+          "معتمد",
+          "Approved"
+        ),
+        t(
+          "الحالة",
+          "Status"
+        )
+      )}
+
+      ${statBox(
+        "v2.4",
+        t(
+          "إصدار النموذج",
+          "Form version"
+        )
+      )}
+
+      ${statBox(
+        "v2",
+        t(
+          "إصدار التقرير",
+          "Report version"
+        )
+      )}
+
+    </div>
+
+    <div
+      class="card"
+      style="margin-top:14px"
+    >
+
+      <div class="cardHead">
+        <div>
+          <h3>
+            ${t(
+              "بيانات القرار",
+              "Decision Snapshot"
+            )}
+          </h3>
+        </div>
+      </div>
+
+      <div class="grid2">
+
+        ${listItem(
+          "user-round-check",
+          t(
+            "نورة العتيبي",
+            "Noura Al Otaibi"
+          ),
+          t(
+            "مديرة قسم الجودة",
+            "Quality Department Manager"
+          )
+        )}
+
+        ${listItem(
+          "calendar-clock",
+          "04 Oct · 10:46",
+          t(
+            "تاريخ ووقت القرار",
+            "Decision date and time"
+          )
+        )}
+
+      </div>
+
+      <div
+        class="permissionNotice"
+        style="margin-top:12px"
+      >
+
+        ${icon("file-check-2")}
+
+        <span>
+          ${t(
+            "التقرير يتضمن البنود والإجابات والأوزان والأدلة والملاحظات والإجراءات التصحيحية وبيانات القرار",
+            "Report includes items answers weights evidence findings corrective actions and decision data"
+          )}
+        </span>
+
+      </div>
+
+      <button
+        class="button primary"
+        style="margin-top:13px"
+        onclick="
+          toast(
+            t(
+              'تنزيل PDF متاح حسب صلاحية الحساب',
+              'PDF download allowed under current permission'
+            )
+          )
+        "
+      >
+        ${icon("download")}
+        ${t(
+          "تنزيل التقرير المعتمد",
+          "Download Approved PDF"
+        )}
+      </button>
+
+    </div>
+  `);
+}
+
+function returnedPage() {
+  return `
+    ${pageIntro(
+      "RETURNED WORK",
+      t(
+        "المعاد إليك للاستكمال",
+        "Returned for Completion"
+      ),
+      t(
+        "بدل البحث عن التقرير يظهر للمفتش مباشرة ما الذي يجب استكماله",
+        "Returned work clearly explains exactly what needs to be completed"
+      )
+    )}
+
+    <div class="card">
+
+      <div class="cardHead">
+
+        <div>
+          <h3>
+            REP-2026-000089
+          </h3>
 
           <p>
-            ${t(
-              'نص البند بالعربية والإنجليزية والوزن والحقول الإلزامية',
-              'Arabic and English text weight and required fields'
-            )}
+            VIS-2026-000115
           </p>
         </div>
 
-        <span class="weight">
-          10
-        </span>
-      </div>
-    </div>
-
-    <button
-      class="btn primary"
-      onclick="
-        toast(
+        ${badge(
           t(
-            'تم حفظ النموذج كمسودة v1.0',
-            'Form saved as draft v1.0'
-          )
-        );
-        closeModal()
-      "
-    >
-      ${t(
-        'حفظ كمسودة',
-        'Save draft'
-      )}
-    </button>
-  `);
+            "معاد للاستكمال",
+            "Returned"
+          ),
+          "warning"
+        )}
+
+      </div>
+
+      <div class="permissionNotice">
+
+        ${icon("message-square-more")}
+
+        <span>
+          ${t(
+            "سبب الإعادة مطلوب إرفاق صورة واضحة لبوابة الطوارئ واستكمال ملاحظة البند رقم 12",
+            "Return reason: upload a clear Emergency Gate image and complete item 12 notes"
+          )}
+        </span>
+
+      </div>
+
+      <div
+        class="heroActionRow"
+        style="margin-top:14px"
+      >
+
+        <button
+          class="button primary"
+          onclick="go('inspection')"
+        >
+          ${icon("pencil")}
+          ${t(
+            "استكمال التقرير",
+            "Complete Report"
+          )}
+        </button>
+
+      </div>
+
+    </div>
+  `;
 }
 
-function guardProfile(name) {
+function guardsPage() {
+  return `
+    ${pageIntro(
+      "GUARD TEAM",
+      t(
+        "الحراس والتقييم",
+        "Guards & Evaluation"
+      ),
+      t(
+        "كل حارس له سجل واحد يجمع التقييمات والملاحظات والتدريب",
+        "Each guard has one record containing evaluations findings and training"
+      )
+    )}
+
+    <div class="card">
+
+      <div class="list">
+
+        ${listItem(
+          "shield",
+          t(
+            "محمد العتيبي",
+            "Mohammed Al Otaibi"
+          ),
+          t(
+            "EMP-1042 · آخر تقييم 92%",
+            "EMP-1042 · Last score 92%"
+          ),
+          `
+            <button
+              class="button"
+              onclick="guardRecord()"
+            >
+              ${t(
+                "فتح السجل",
+                "Open"
+              )}
+            </button>
+          `
+        )}
+
+        ${listItem(
+          "shield",
+          t(
+            "سعد القحطاني",
+            "Saad Al Qahtani"
+          ),
+          t(
+            "EMP-1088 · آخر تقييم 86%",
+            "EMP-1088 · Last score 86%"
+          ),
+          `
+            <button
+              class="button"
+              onclick="guardRecord()"
+            >
+              ${t(
+                "فتح السجل",
+                "Open"
+              )}
+            </button>
+          `
+        )}
+
+      </div>
+
+    </div>
+  `;
+}
+
+function guardRecord() {
   modal(`
     <h2>
-      ${name}
+      ${t(
+        "محمد العتيبي",
+        "Mohammed Al Otaibi"
+      )}
     </h2>
 
-    <p class="sub">
+    <p
+      style="
+        color:var(--muted);
+        font-size:9px
+      "
+    >
       EMP-1042
       ·
-      ***6789
-      ·
-      ${projectName('P-001')}
+      ${projectName(
+        "P-001"
+      )}
     </p>
 
-    <div
-      class="kpis"
-      style="
-        grid-template-columns:
-          repeat(3,1fr);
-        margin-top:14px
-      "
-    >
-      <div class="kpi">
-        <b>92%</b>
+    <div class="statRow">
 
-        <span>
-          ${t(
-            'آخر تقييم',
-            'Last score'
-          )}
-        </span>
-      </div>
+      ${statBox(
+        "92%",
+        t(
+          "آخر تقييم",
+          "Last evaluation"
+        )
+      )}
 
-      <div class="kpi">
-        <b>14</b>
+      ${statBox(
+        "14",
+        t(
+          "تقييمًا",
+          "Evaluations"
+        )
+      )}
 
-        <span>
-          ${t(
-            'تقييم',
-            'Evaluations'
-          )}
-        </span>
-      </div>
+      ${statBox(
+        "1",
+        t(
+          "ملاحظة متكررة",
+          "Repeated finding"
+        )
+      )}
 
-      <div class="kpi">
-        <b>1</b>
+      ${statBox(
+        "2",
+        t(
+          "دورات",
+          "Trainings"
+        )
+      )}
 
-        <span>
-          ${t(
-            'ملاحظة متكررة',
-            'Repeated finding'
-          )}
-        </span>
-      </div>
     </div>
 
-    <div class="timeline">
-      <div class="tl">
-        <b>
-          ${t(
-            'تقييم زيارة VIS-000123',
-            'VIS-000123 evaluation'
-          )}
-        </b>
+    <div
+      class="heroActionRow"
+      style="margin-top:14px"
+    >
 
-        <p>
-          92%
-          ·
-          ${t(
-            'ملاحظة تسليم وردية',
-            'Shift handover note'
-          )}
-        </p>
-      </div>
+      <button
+        class="button primary"
+        onclick="guardEvaluationModal()"
+      >
+        ${icon("user-round-check")}
+        ${t(
+          "تقييم جديد",
+          "New Evaluation"
+        )}
+      </button>
 
-      <div class="tl">
-        <b>
-          ${t(
-            'دورة التعامل مع الزوار',
-            'Visitor Handling training'
-          )}
-        </b>
+      <button
+        class="button"
+        onclick="
+          closeModal();
+          go('training')
+        "
+      >
+        ${icon("graduation-cap")}
+        ${t(
+          "طلب تدريب",
+          "Training Request"
+        )}
+      </button>
 
-        <p>
-          ${t(
-            'مكتملة · شهادة مرفقة',
-            'Completed · certificate attached'
-          )}
-        </p>
-      </div>
     </div>
   `);
 }
 
-function escalationSettings() {
+function trainingPage() {
+  return `
+    ${pageIntro(
+      "TRAINING WORKFLOW",
+      t(
+        "طلبات التدريب",
+        "Training Requests"
+      ),
+      t(
+        "المسار واضح من مشرف الحراس إلى مدير المشروع ثم إدارة الجودة ثم إثبات الإتمام",
+        "The workflow moves from Guard Supervisor to Project Manager then Quality and finally completion evidence"
+      ),
+      state.role ===
+        "guard_supervisor"
+        ? `
+          <button
+            class="button primary"
+            onclick="trainingRequestModal()"
+          >
+            ${icon("plus")}
+            ${t(
+              "طلب دورة",
+              "Request Training"
+            )}
+          </button>
+        `
+        : ""
+    )}
+
+    <div class="workflow">
+
+      <div class="workflowItem active">
+        <span>01</span>
+        <b>
+          ${t(
+            "مشرف الحراس",
+            "Guard Supervisor"
+          )}
+        </b>
+        <small>
+          ${t(
+            "إنشاء الطلب",
+            "Creates request"
+          )}
+        </small>
+      </div>
+
+      <div class="workflowItem">
+        <span>02</span>
+        <b>
+          ${t(
+            "مدير المشروع",
+            "Project Manager"
+          )}
+        </b>
+        <small>
+          ${t(
+            "موافقة أو إعادة أو رفض",
+            "Approve return or reject"
+          )}
+        </small>
+      </div>
+
+      <div class="workflowItem">
+        <span>03</span>
+        <b>
+          ${t(
+            "إدارة الجودة",
+            "Quality Management"
+          )}
+        </b>
+        <small>
+          ${t(
+            "الاعتماد النهائي",
+            "Final approval"
+          )}
+        </small>
+      </div>
+
+      <div class="workflowItem">
+        <span>04</span>
+        <b>
+          ${t(
+            "التنفيذ",
+            "Completion"
+          )}
+        </b>
+        <small>
+          ${t(
+            "رفع شهادة أو إثبات",
+            "Upload certificate"
+          )}
+        </small>
+      </div>
+
+      <div class="workflowItem">
+        <span>05</span>
+        <b>
+          ${t(
+            "سجل الموظف",
+            "Employee Record"
+          )}
+        </b>
+        <small>
+          ${t(
+            "الحفظ التاريخي",
+            "Historical record"
+          )}
+        </small>
+      </div>
+
+    </div>
+
+    <section class="section">
+
+      <div class="card">
+
+        <div class="list">
+
+          ${listItem(
+            "graduation-cap",
+            "TRN-2026-0018",
+            t(
+              "إدارة الحشود · محمد العتيبي",
+              "Crowd Management · Mohammed Al Otaibi"
+            ),
+            badge(
+              t(
+                "بانتظار مدير المشروع",
+                "Pending Project Manager"
+              ),
+              "warning"
+            )
+          )}
+
+          ${listItem(
+            "graduation-cap",
+            "TRN-2026-0015",
+            t(
+              "الاستجابة للطوارئ · سعد القحطاني",
+              "Emergency Response · Saad Al Qahtani"
+            ),
+            badge(
+              t(
+                "عند إدارة الجودة",
+                "At Quality"
+              ),
+              "info"
+            )
+          )}
+
+        </div>
+
+      </div>
+
+    </section>
+  `;
+}
+
+function trainingRequestModal() {
   modal(`
     <h2>
       ${t(
-        'سياسة التصعيد',
-        'Escalation Policy'
-      )}
-    </h2>
-
-    <p class="sub">
-      ${t(
-        'القرار النهائي للأيام وبداية العد يتم تثبيته قبل التنفيذ',
-        'Final day basis and start point are approved before implementation'
-      )}
-    </p>
-
-    <div
-      class="formGrid"
-      style="margin-top:14px"
-    >
-      <div class="field">
-        <label>
-          ${t(
-            'بداية العد',
-            'Timer starts from'
-          )}
-        </label>
-
-        <select
-          id="esStart"
-          class="select"
-        >
-          <option
-            value="finding_created"
-            ${
-              S.escalationStart ===
-              'finding_created'
-                ? 'selected'
-                : ''
-            }
-          >
-            ${t(
-              'لحظة تسجيل الملاحظة',
-              'Finding creation'
-            )}
-          </option>
-
-          <option
-            value="due_date"
-            ${
-              S.escalationStart ===
-              'due_date'
-                ? 'selected'
-                : ''
-            }
-          >
-            ${t(
-              'تاريخ الاستحقاق',
-              'Due date'
-            )}
-          </option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'نوع الأيام',
-            'Day type'
-          )}
-        </label>
-
-        <select
-          id="esBasis"
-          class="select"
-        >
-          <option
-            value="calendar"
-            ${
-              S.escalationBasis ===
-              'calendar'
-                ? 'selected'
-                : ''
-            }
-          >
-            ${t(
-              'أيام تقويمية',
-              'Calendar days'
-            )}
-          </option>
-
-          <option
-            value="business"
-            ${
-              S.escalationBasis ===
-              'business'
-                ? 'selected'
-                : ''
-            }
-          >
-            ${t(
-              'أيام عمل',
-              'Business days'
-            )}
-          </option>
-        </select>
-      </div>
-    </div>
-
-    <div
-      class="escalationFlow"
-      style="margin-top:14px"
-    >
-      <div class="flowNode yellow">
-        <b>3</b>
-
-        <span>
-          ${t(
-            'أصفر + بريد',
-            'Yellow + email'
-          )}
-        </span>
-      </div>
-
-      <div class="flowLine"></div>
-
-      <div class="flowNode orange">
-        <b>6</b>
-
-        <span>
-          ${t(
-            'برتقالي + بريد',
-            'Orange + email'
-          )}
-        </span>
-      </div>
-
-      <div class="flowLine"></div>
-
-      <div class="flowNode red">
-        <b>9</b>
-
-        <span>
-          ${t(
-            'أحمر + بريد',
-            'Red + email'
-          )}
-        </span>
-      </div>
-
-      <div class="flowLine"></div>
-
-      <div class="flowNode senior">
-        <b>
-          ${I('building-2')}
-        </b>
-
-        <span>
-          ${t(
-            'الإدارة العليا',
-            'Senior Management'
-          )}
-        </span>
-      </div>
-    </div>
-
-    <button
-      class="btn primary"
-      style="margin-top:14px"
-      onclick="saveEscalationSettings()"
-    >
-      ${t(
-        'حفظ الإعداد التجريبي',
-        'Save demo policy'
-      )}
-    </button>
-  `);
-}
-
-function saveEscalationSettings() {
-  S.escalationStart =
-    document.querySelector(
-      '#esStart'
-    )?.value ||
-    'finding_created';
-
-  S.escalationBasis =
-    document.querySelector(
-      '#esBasis'
-    )?.value ||
-    'calendar';
-
-  toast(
-    t(
-      'تم حفظ سياسة التصعيد في الديمو',
-      'Demo escalation policy saved'
-    )
-  );
-
-  closeModal();
-  render();
-}
-
-function actionModal(id) {
-  modal(`
-    <h2>
-      ${id}
-    </h2>
-
-    <p class="sub">
-      ${t(
-        'مخالفة مرتبطة بزيارة وبند ومشروع ومسؤول وموعد مستهدف',
-        'Finding linked to visit item project owner and due date'
-      )}
-    </p>
-
-    <div
-      class="timeline"
-      style="margin-top:14px"
-    >
-      <div class="tl">
-        <b>
-          ${t(
-            'إنشاء المخالفة',
-            'Finding created'
-          )}
-        </b>
-
-        <p>
-          ${t(
-            'من بند غير مطابق مع صورة',
-            'From non compliant item with evidence'
-          )}
-        </p>
-      </div>
-
-      <div class="tl">
-        <b>
-          ${t(
-            'إسناد الإجراء',
-            'Action assigned'
-          )}
-        </b>
-
-        <p>
-          ${t(
-            'المسؤول والموعد والخطورة محفوظة',
-            'Owner due date and severity stored'
-          )}
-        </p>
-      </div>
-
-      <div class="tl">
-        <b>
-          ${t(
-            'التصعيد',
-            'Escalation'
-          )}
-        </b>
-
-        <p>
-          ${t(
-            'تم إرسال بريد حسب المرحلة الحالية',
-            'Email simulated for current escalation stage'
-          )}
-        </p>
-      </div>
-
-      <div class="tl">
-        <b>
-          ${t(
-            'دليل المعالجة',
-            'Treatment evidence'
-          )}
-        </b>
-
-        <p>
-          ${t(
-            'بانتظار مراجعة الجودة',
-            'Pending Quality review'
-          )}
-        </p>
-      </div>
-    </div>
-
-    <button
-      class="btn primary"
-      onclick="
-        toast(
-          t(
-            'تم اعتماد الإغلاق',
-            'Closure approved'
-          )
-        );
-        closeModal()
-      "
-    >
-      ${I(
-        'circle-check-big'
-      )}
-
-      ${t(
-        'اعتماد الإغلاق',
-        'Approve closure'
-      )}
-    </button>
-  `);
-}
-
-function trainingModal() {
-  modal(`
-    <h2>
-      ${t(
-        'طلب دورة تدريبية',
-        'Training Request'
+        "طلب دورة تدريبية",
+        "Training Request"
       )}
     </h2>
 
     <div class="formGrid">
+
       <div class="field">
         <label>
           ${t(
-            'الموظف',
-            'Employee'
+            "الحارس",
+            "Guard"
           )}
         </label>
 
-        <select class="select">
+        <select class="input">
           <option>
             ${t(
-              'محمد العتيبي',
-              'Mohammed Al Otaibi'
+              "محمد العتيبي",
+              "Mohammed Al Otaibi"
             )}
-            ·
-            EMP-1042
           </option>
         </select>
       </div>
@@ -9214,23 +5999,23 @@ function trainingModal() {
       <div class="field">
         <label>
           ${t(
-            'الدورة',
-            'Course'
+            "الدورة",
+            "Course"
           )}
         </label>
 
-        <select class="select">
+        <select class="input">
           <option>
             ${t(
-              'إدارة الحشود',
-              'Crowd Management'
+              "إدارة الحشود",
+              "Crowd Management"
             )}
           </option>
 
           <option>
             ${t(
-              'الاستجابة للطوارئ',
-              'Emergency Response'
+              "الاستجابة للطوارئ",
+              "Emergency Response"
             )}
           </option>
         </select>
@@ -9239,37 +6024,25 @@ function trainingModal() {
       <div class="field span2">
         <label>
           ${t(
-            'السبب',
-            'Reason'
+            "سبب الطلب",
+            "Reason"
           )}
         </label>
 
-        <textarea class="textarea">${t(
-          'ملاحظة متكررة مرتبطة بالتقييم',
-          'Repeated finding linked to evaluation'
+        <textarea class="input">${t(
+          "ملاحظة متكررة ظهرت أثناء التقييم",
+          "Repeated finding identified during evaluation"
         )}</textarea>
       </div>
-    </div>
 
-    <div
-      class="policyHint"
-      style="margin-top:10px"
-    >
-      ${I('route')}
-
-      ${t(
-        'المسار مشرف الحراس ثم مدير المشروع ثم إدارة الجودة',
-        'Flow Guard Supervisor then Project Manager then Quality Management'
-      )}
     </div>
 
     <button
-      class="btn primary"
-      style="margin-top:10px"
+      class="button primary"
       onclick="
         toast(
           t(
-            'تم رفع الطلب لمدير المشروع',
+            'تم إرسال الطلب لمدير المشروع',
             'Request sent to Project Manager'
           )
         );
@@ -9277,19 +6050,1039 @@ function trainingModal() {
       "
     >
       ${t(
-        'إرسال الطلب',
-        'Submit request'
+        "إرسال",
+        "Submit"
       )}
     </button>
   `);
 }
 
+function formsPage() {
+  return `
+    ${pageIntro(
+      "FORM VERSIONING",
+      t(
+        "النماذج والإصدارات",
+        "Forms & Versions"
+      ),
+      t(
+        "الإدارة تبني النماذج من داخل النظام والنموذج المنشور لا يتغير بل يتم إنشاء إصدار جديد",
+        "Forms are managed in-system and published versions remain immutable while changes create new versions"
+      )
+    )}
+
+    <div class="grid2">
+
+      <div class="card">
+
+        <div class="cardHead">
+
+          <div>
+            <h3>
+              ${t(
+                "نموذج التفتيش الدوري",
+                "Routine Inspection Form"
+              )}
+            </h3>
+
+            <p>
+              ${t(
+                "42 بندًا",
+                "42 items"
+              )}
+            </p>
+          </div>
+
+          ${badge(
+            t(
+              "منشور",
+              "Published"
+            ),
+            "success"
+          )}
+
+        </div>
+
+        <div class="list">
+
+          ${listItem(
+            "git-branch",
+            "v2.4",
+            t(
+              "الإصدار الحالي · مقفل",
+              "Current version · locked"
+            ),
+            badge(
+              t(
+                "نشط",
+                "Active"
+              ),
+              "success"
+            )
+          )}
+
+          ${listItem(
+            "archive",
+            "v2.3",
+            t(
+              "استخدم في 28 زيارة",
+              "Used in 28 visits"
+            ),
+            badge(
+              t(
+                "مؤرشف",
+                "Archived"
+              ),
+              "neutral"
+            )
+          )}
+
+        </div>
+
+        <button
+          class="button primary"
+          style="margin-top:12px"
+          onclick="
+            toast(
+              t(
+                'تم إنشاء v2.5 كمسودة',
+                'Created v2.5 as draft'
+              )
+            )
+          "
+        >
+          ${icon("git-branch")}
+          ${t(
+            "إصدار جديد",
+            "New Version"
+          )}
+        </button>
+
+      </div>
+
+      <div class="card">
+
+        <div class="permissionNotice">
+
+          ${icon("lock")}
+
+          <span>
+            ${t(
+              "نتائج الزيارات القديمة لا تتغير عند تعديل النموذج لأن كل زيارة تحتفظ بنصوص البنود والأوزان والإصدار وقت التنفيذ",
+              "Historical visit results never change because each visit stores the item text weights and form version used at execution time"
+            )}
+          </span>
+
+        </div>
+
+      </div>
+
+    </div>
+  `;
+}
+
+function permissionsPage() {
+  return `
+    ${pageIntro(
+      "ACCESS CONTROL",
+      t(
+        "الصلاحيات ونطاق البيانات",
+        "Permissions & Data Scope"
+      ),
+      t(
+        "القالب يحدد الوظائف والمشروع يحدد نطاق البيانات والبلاغات الحساسة لها تصريح مستقل يملكه صاحب النظام فقط",
+        "Role templates define functions project assignment defines data scope and sensitive access is an independent owner-controlled permission"
+      )
+    )}
+
+    <div class="grid2">
+
+      <div class="card">
+
+        <div class="cardHead">
+          <div>
+            <h3>
+              ${t(
+                "قوالب الأدوار",
+                "Role Templates"
+              )}
+            </h3>
+          </div>
+        </div>
+
+        <div class="list">
+
+          ${listItem(
+            "badge-check",
+            t(
+              "إدارة الجودة",
+              "Quality Management"
+            ),
+            t(
+              "المشاريع والجدولة والمراجعة والاعتماد والتقارير",
+              "Projects scheduling review approval and reports"
+            )
+          )}
+
+          ${listItem(
+            "scan-search",
+            t(
+              "مفتش الجودة",
+              "Quality Inspector"
+            ),
+            t(
+              "زياراته والتفتيش والأدلة وما يعاد إليه فقط",
+              "Own visits inspection evidence and returned work only"
+            )
+          )}
+
+          ${listItem(
+            "briefcase-business",
+            t(
+              "مدير المشروع",
+              "Project Manager"
+            ),
+            t(
+              "المشروع المسند فقط",
+              "Assigned project only"
+            )
+          )}
+
+          ${listItem(
+            "users-round",
+            t(
+              "مشرف الحراس",
+              "Guard Supervisor"
+            ),
+            t(
+              "التقييم وطلبات التدريب",
+              "Evaluation and training requests"
+            )
+          )}
+
+        </div>
+
+      </div>
+
+      <div class="card">
+
+        <div class="cardHead">
+          <div>
+            <h3>
+              ${t(
+                "اختبار الحماية",
+                "Access Test"
+              )}
+            </h3>
+          </div>
+        </div>
+
+        <div class="permissionNotice">
+
+          ${icon("shield-x")}
+
+          <span>
+            ${t(
+              "في النظام النهائي لا يعتمد المنع على إخفاء الزر فقط بل يتم التحقق من الصلاحية والنطاق في الخادم عند كل رابط وبحث وتنزيل وتصدير",
+              "Production access is enforced server-side for every direct URL search download and export rather than merely hiding interface buttons"
+            )}
+          </span>
+
+        </div>
+
+        <button
+          class="button danger"
+          style="margin-top:13px"
+          onclick="accessDeniedDemo()"
+        >
+          ${icon("shield-x")}
+          ${t(
+            "محاولة فتح مشروع غير مصرح",
+            "Try unauthorized project"
+          )}
+        </button>
+
+      </div>
+
+    </div>
+  `;
+}
+
+function accessDeniedDemo() {
+  modal(`
+    <div
+      style="
+        text-align:center;
+        padding:20px 0
+      "
+    >
+      <div
+        class="taskIcon red"
+        style="
+          margin:auto
+        "
+      >
+        ${icon("shield-x")}
+      </div>
+
+      <h2
+        style="
+          padding:0;
+          margin-top:17px
+        "
+      >
+        403 · Access Denied
+      </h2>
+
+      <p
+        style="
+          color:var(--muted);
+          font-size:9px;
+          line-height:1.8
+        "
+      >
+        ${t(
+          "هذا الحساب لا يملك صلاحية الوصول إلى المشروع المطلوب حتى عند استخدام رابط مباشر",
+          "This account cannot access the requested project even through a direct URL"
+        )}
+      </p>
+    </div>
+  `);
+}
+
+function sensitivePage() {
+  if (
+    state.role === "guard"
+  ) {
+    return guardSensitivePage();
+  }
+
+  return ownerSensitivePage();
+}
+
+function ownerSensitivePage() {
+  return `
+    ${pageIntro(
+      "PRIVATE CHANNEL",
+      t(
+        "البلاغات الحساسة",
+        "Sensitive Reports"
+      ),
+      t(
+        "هذه الوحدة منفصلة عن باقي النظام ولا يحصل عليها أي دور تلقائيًا",
+        "This module is isolated from the rest of the system and no role receives automatic access"
+      )
+    )}
+
+    <div class="privateHero">
+
+      ${icon("lock-keyhole")}
+
+      <h2>
+        ${t(
+          "أنت من يحدد من يستطيع الدخول",
+          "You decide who can access"
+        )}
+      </h2>
+
+      <p>
+        ${t(
+          "إدارة الجودة ومدير المشروع والمشرف وموظف الجودة لا يحصلون على البلاغات الحساسة لمجرد مسماهم الوظيفي ولا يستطيع أي شخص منح نفسه أو غيره هذه الصلاحية",
+          "Quality Management Project Managers Supervisors and Quality Officers do not receive sensitive access through their role and no user may grant it to themselves or others"
+        )}
+      </p>
+
+    </div>
+
+    <section class="section">
+
+      <div class="grid2">
+
+        <div class="card">
+
+          <div class="cardHead">
+            <div>
+              <h3>
+                ${t(
+                  "الأشخاص المخولون",
+                  "Authorized People"
+                )}
+              </h3>
+            </div>
+          </div>
+
+          <div class="list">
+
+            ${listItem(
+              "crown",
+              t(
+                "سلطان",
+                "Sultan"
+              ),
+              t(
+                "مالك النظام",
+                "System Owner"
+              ),
+              badge(
+                t(
+                  "مخول",
+                  "Authorized"
+                ),
+                "success"
+              )
+            )}
+
+          </div>
+
+          <div
+            class="field"
+            style="margin-top:13px"
+          >
+
+            <label>
+              ${t(
+                "منح تصريح مستقل",
+                "Grant independent access"
+              )}
+            </label>
+
+            <select
+              id="sensitiveRole"
+              class="input"
+            >
+
+              <option value="quality_staff">
+                ${t(
+                  "موظف الجودة",
+                  "Quality Officer"
+                )}
+              </option>
+
+              <option value="project_manager">
+                ${t(
+                  "مدير المشروع",
+                  "Project Manager"
+                )}
+              </option>
+
+              <option value="inspector">
+                ${t(
+                  "مفتش الجودة",
+                  "Quality Inspector"
+                )}
+              </option>
+
+              <option value="guard_supervisor">
+                ${t(
+                  "مشرف الحراس",
+                  "Guard Supervisor"
+                )}
+              </option>
+
+            </select>
+
+          </div>
+
+          <div class="heroActionRow">
+
+            <button
+              class="button primary"
+              onclick="grantSensitive()"
+            >
+              ${t(
+                "منح",
+                "Grant"
+              )}
+            </button>
+
+            <button
+              class="button danger"
+              onclick="revokeSensitive()"
+            >
+              ${t(
+                "سحب",
+                "Revoke"
+              )}
+            </button>
+
+          </div>
+
+        </div>
+
+        <div class="card">
+
+          <div class="cardHead">
+            <div>
+              <h3>
+                ${t(
+                  "سجل الاطلاع المحمي",
+                  "Protected Access Log"
+                )}
+              </h3>
+            </div>
+          </div>
+
+          <div class="list">
+
+            ${listItem(
+              "eye",
+              "SEC-2026-0012",
+              t(
+                "فتح بواسطة سلطان · 11:04",
+                "Opened by Sultan · 11:04"
+              )
+            )}
+
+            ${listItem(
+              "message-square-more",
+              t(
+                "إضافة رد",
+                "Reply added"
+              ),
+              t(
+                "المحتوى لا يظهر في الإشعارات",
+                "Sensitive content is excluded from notifications"
+              )
+            )}
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+  `;
+}
+
+function guardSensitivePage() {
+  return `
+    ${pageIntro(
+      "PRIVATE REPORT",
+      t(
+        "قناة خاصة وآمنة",
+        "Private & Secure Channel"
+      ),
+      t(
+        "لا تستطيع مشاهدة بلاغات الآخرين وتتابع فقط ما أرسلته أنت",
+        "You cannot view other users reports and can only track your own submissions"
+      )
+    )}
+
+    <div class="grid2">
+
+      <div class="card">
+
+        <div class="field">
+
+          <label>
+            ${t(
+              "نوع الطلب",
+              "Type"
+            )}
+          </label>
+
+          <select class="input">
+            <option>
+              ${t(
+                "بلاغ حساس",
+                "Sensitive Report"
+              )}
+            </option>
+
+            <option>
+              ${t(
+                "شكوى",
+                "Complaint"
+              )}
+            </option>
+
+            <option>
+              ${t(
+                "استبيان",
+                "Survey"
+              )}
+            </option>
+          </select>
+
+        </div>
+
+        <div class="field">
+
+          <label>
+            ${t(
+              "الموضوع",
+              "Subject"
+            )}
+          </label>
+
+          <input
+            class="input"
+            placeholder="${t(
+              "عنوان مختصر",
+              "Short subject"
+            )}"
+          >
+
+        </div>
+
+        <div class="field">
+
+          <label>
+            ${t(
+              "التفاصيل",
+              "Details"
+            )}
+          </label>
+
+          <textarea
+            class="input"
+          ></textarea>
+
+        </div>
+
+        <button
+          class="button primary"
+          onclick="
+            toast(
+              t(
+                'تم إرسال البلاغ إلى القناة الخاصة',
+                'Report submitted to the private channel'
+              )
+            )
+          "
+        >
+          ${icon("shield-check")}
+          ${t(
+            "إرسال بأمان",
+            "Submit Securely"
+          )}
+        </button>
+
+      </div>
+
+      <div class="card">
+
+        <div class="cardHead">
+          <div>
+            <h3>
+              ${t(
+                "بلاغاتي",
+                "My Reports"
+              )}
+            </h3>
+          </div>
+        </div>
+
+        <div class="list">
+
+          ${listItem(
+            "lock-keyhole",
+            "SEC-2026-0012",
+            t(
+              "يوجد رد جديد",
+              "New reply available"
+            ),
+            badge(
+              t(
+                "قيد المتابعة",
+                "In Progress"
+              ),
+              "info"
+            )
+          )}
+
+        </div>
+
+      </div>
+
+    </div>
+  `;
+}
+
+function myServicesPage() {
+  return guardSensitivePage();
+}
+
+function operationsPage() {
+  return `
+    ${pageIntro(
+      "OPERATIONS & HANDOVER",
+      t(
+        "التشغيل والتسليم",
+        "Operations & Handover"
+      ),
+      t(
+        "كل ما يتعلق بالملكية والاستضافة والنسخ والدعم والتسليم النهائي يظهر هنا بشكل واضح",
+        "Ownership hosting backups support and final handover are summarized clearly here"
+      )
+    )}
+
+    <div class="grid2">
+
+      <div class="card">
+
+        <div class="cardHead">
+          <div>
+            <h3>
+              ${t(
+                "مدة التنفيذ",
+                "Implementation Duration"
+              )}
+            </h3>
+          </div>
+        </div>
+
+        <div class="statRow">
+
+          ${statBox(
+            "25–30",
+            t(
+              "مرحلة أولى",
+              "Phase 1 days"
+            )
+          )}
+
+          ${statBox(
+            "20–25",
+            t(
+              "مرحلة ثانية",
+              "Phase 2 days"
+            )
+          )}
+
+          ${statBox(
+            "45–55",
+            t(
+              "إجمالي أيام العمل",
+              "Total working days"
+            )
+          )}
+
+          ${statBox(
+            "60",
+            t(
+              "يوم ضمان أخطاء",
+              "Warranty days"
+            )
+          )}
+
+        </div>
+
+      </div>
+
+      <div class="card">
+
+        <div class="cardHead">
+          <div>
+            <h3>
+              ${t(
+                "التكاليف التشغيلية",
+                "Operating Costs"
+              )}
+            </h3>
+
+            <p>
+              ${t(
+                "لا تفعل أي خدمة مدفوعة قبل موافقة العميل",
+                "No paid service is activated without approval"
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div class="list">
+
+          ${listItem(
+            "server",
+            t(
+              "الاستضافة",
+              "Hosting"
+            ),
+            t(
+              "تحدد قبل الشراء حسب السعة والأداء",
+              "Quoted before purchase according to capacity"
+            )
+          )}
+
+          ${listItem(
+            "mail",
+            t(
+              "البريد",
+              "Email"
+            ),
+            t(
+              "SMTP للتفعيل والتنبيهات والتصعيد",
+              "SMTP for activation notifications and escalation"
+            )
+          )}
+
+          ${listItem(
+            "hard-drive",
+            t(
+              "التخزين والنسخ",
+              "Storage & Backup"
+            ),
+            t(
+              "حسب حجم الصور والفيديو وسياسة الاحتفاظ",
+              "Based on media volume and retention policy"
+            )
+          )}
+
+          ${listItem(
+            "chart-no-axes-combined",
+            t(
+              "التحليلات",
+              "Analytics"
+            ),
+            t(
+              "داخل النظام بدون Power BI",
+              "Built in-system without Power BI"
+            ),
+            badge(
+              t(
+                "بدون اشتراك",
+                "No BI Subscription"
+              ),
+              "success"
+            )
+          )}
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <section class="section">
+
+      <div class="card">
+
+        <div class="cardHead">
+          <div>
+            <h3>
+              ${t(
+                "التسليم النهائي",
+                "Final Handover"
+              )}
+            </h3>
+          </div>
+        </div>
+
+        <div class="grid2">
+
+          ${listItem(
+            "code-2",
+            t(
+              "الكود المصدري",
+              "Source Code"
+            ),
+            t(
+              "كامل وتحت ملكية العميل",
+              "Complete and client-owned"
+            )
+          )}
+
+          ${listItem(
+            "database",
+            t(
+              "قاعدة البيانات",
+              "Database"
+            ),
+            t(
+              "المخطط والنسخة النهائية",
+              "Schema and final copy"
+            )
+          )}
+
+          ${listItem(
+            "key-round",
+            t(
+              "حساب الإدارة",
+              "Admin Account"
+            ),
+            t(
+              "وصول كامل",
+              "Full access"
+            )
+          )}
+
+          ${listItem(
+            "book-open-check",
+            t(
+              "التشغيل والنسخ والاستعادة",
+              "Run Backup & Restore"
+            ),
+            t(
+              "دليل كامل مع تجربة استعادة",
+              "Full guide plus restore test"
+            )
+          )}
+
+        </div>
+
+        <div
+          class="permissionNotice"
+          style="margin-top:14px"
+        >
+
+          ${icon("badge-check")}
+
+          <span>
+            ${t(
+              "المشروع لا يعتبر مكتملًا إلا بعد تنفيذ النطاق المتفق عليه ومعالجة الملاحظات المتعلقة به وإعادة الاختبار ثم الاعتماد النهائي",
+              "The project is not considered complete until the agreed scope is implemented in-scope issues are fixed and retested and final acceptance is received"
+            )}
+          </span>
+
+        </div>
+
+      </div>
+
+    </section>
+  `;
+}
+
+function home() {
+  switch (
+    state.role
+  ) {
+    case "owner":
+      return ownerHome();
+
+    case "quality_admin":
+      return qualityAdminHome();
+
+    case "quality_staff":
+      return qualityStaffHome();
+
+    case "project_manager":
+      return projectManagerHome();
+
+    case "inspector":
+      return inspectorHome();
+
+    case "guard_supervisor":
+      return supervisorHome();
+
+    case "guard":
+      return guardHome();
+
+    default:
+      return ownerHome();
+  }
+}
+
+function render() {
+  const views = {
+    home,
+
+    projects:
+      projectsPage,
+
+    project:
+      projectPage,
+
+    schedule:
+      schedulePage,
+
+    my_visits:
+      myVisitsPage,
+
+    inspection:
+      inspectionPage,
+
+    review:
+      reviewPage,
+
+    actions:
+      actionsPage,
+
+    analytics:
+      analyticsPage,
+
+    reports:
+      reportsPage,
+
+    my_reports:
+      myReportsPage,
+
+    returned:
+      returnedPage,
+
+    guards:
+      guardsPage,
+
+    training:
+      trainingPage,
+
+    forms:
+      formsPage,
+
+    permissions:
+      permissionsPage,
+
+    sensitive:
+      sensitivePage,
+
+    my_services:
+      myServicesPage,
+
+    operations:
+      operationsPage
+  };
+
+  const view =
+    views[state.page] ||
+    home;
+
+  document.querySelector(
+    "#page"
+  ).innerHTML =
+    view();
+
+  setupNavigation();
+
+  refreshIcons();
+
+  if (
+    state.page ===
+    "schedule"
+  ) {
+    renderAvailability();
+  }
+
+  animatePage();
+}
+
+function openProject(id) {
+  if (
+    state.role ===
+      "project_manager" &&
+    id !== "P-001"
+  ) {
+    accessDeniedDemo();
+
+    return;
+  }
+
+  state.page =
+    state.role ===
+      "project_manager"
+      ? "project"
+      : "project";
+
+  render();
+}
+
 function grantSensitive() {
-  if (S.role !== 'owner') {
+  if (
+    state.role !== "owner"
+  ) {
     toast(
       t(
-        'مالك النظام فقط يستطيع منح هذه الصلاحية',
-        'Only System Owner can grant this permission'
+        "مالك النظام فقط يستطيع منح هذه الصلاحية",
+        "Only the System Owner can grant this permission"
       )
     );
 
@@ -9298,1307 +7091,699 @@ function grantSensitive() {
 
   const role =
     document.querySelector(
-      '#grantRole'
+      "#sensitiveRole"
     )?.value;
 
   if (
-    role &&
-    !S.sensitiveGranted.includes(
+    !state.sensitiveAccess.includes(
       role
     )
   ) {
-    S.sensitiveGranted.push(
+    state.sensitiveAccess.push(
       role
     );
   }
 
   toast(
     t(
-      'تم منح التصريح المستقل وتسجيل العملية',
-      'Independent access granted and action logged'
+      "تم منح التصريح المستقل وتسجيل العملية",
+      "Independent permission granted and logged"
     )
   );
-
-  setupNav();
-  render();
 }
 
 function revokeSensitive() {
-  if (S.role !== 'owner') {
-    toast(
-      t(
-        'مالك النظام فقط يستطيع سحب هذه الصلاحية',
-        'Only System Owner can revoke this permission'
-      )
-    );
-
+  if (
+    state.role !== "owner"
+  ) {
     return;
   }
 
   const role =
     document.querySelector(
-      '#grantRole'
+      "#sensitiveRole"
     )?.value;
 
-  S.sensitiveGranted =
-    S.sensitiveGranted.filter(
+  state.sensitiveAccess =
+    state.sensitiveAccess.filter(
       item => item !== role
     );
 
   toast(
     t(
-      'تم سحب التصريح وتسجيل العملية',
-      'Access revoked and action logged'
+      "تم سحب التصريح وتسجيل العملية",
+      "Permission revoked and logged"
     )
   );
-
-  setupNav();
-  render();
 }
 
-function reportModal(
-  id = 'REP-2026-000094',
-  status = 'approved'
-) {
-  const approved =
-    status === 'approved';
-
-  const decision =
-    approved
-      ? {
-          name: t(
-            'نورة العتيبي',
-            'Noura Al Otaibi'
-          ),
-          title: t(
-            'مديرة قسم الجودة',
-            'Quality Department Manager'
-          ),
-          time:
-            '04 Oct 2026 · 10:46',
-          reason: '—'
-        }
-      : {
-          name: t(
-            'سارة محمد',
-            'Sarah Mohammed'
-          ),
-          title: t(
-            'موظف جودة',
-            'Quality Officer'
-          ),
-          time:
-            '30 Sep 2026 · 13:15',
-          reason: t(
-            'استكمال صورة بوابة الطوارئ',
-            'Complete emergency gate evidence photo'
-          )
-        };
-
-  modal(`
-    <div
-      class="hero"
-      style="padding:18px"
-    >
-      <div class="kicker">
-        ${I('file-check-2')}
-
-        ${t(
-          'تقرير تفتيش',
-          'Inspection Report'
-        )}
-      </div>
-
-      <h2>
-        ${id}
-      </h2>
-
-      <p>
-        ${projectName('P-001')}
-        ·
-        VIS-2026-000123
-        ·
-        v2.4
-      </p>
-    </div>
-
-    <div
-      class="kpis"
-      style="
-        grid-template-columns:
-          repeat(4,1fr);
-        margin-top:12px
-      "
-    >
-      <div class="kpi">
-        <b>
-          ${
-            approved
-              ? '92%'
-              : '—'
-          }
-        </b>
-
-        <span>
-          ${t(
-            'النتيجة',
-            'Score'
-          )}
-        </span>
-      </div>
-
-      <div class="kpi">
-        <b>
-          ${
-            approved
-              ? t(
-                  'معتمد',
-                  'Approved'
-                )
-              : t(
-                  'معاد',
-                  'Returned'
-                )
-          }
-        </b>
-
-        <span>
-          ${t(
-            'الحالة',
-            'Status'
-          )}
-        </span>
-      </div>
-
-      <div class="kpi">
-        <b>
-          ${decision.time
-            .split('·')
-            .pop()
-            .trim()}
-        </b>
-
-        <span>
-          ${t(
-            'وقت القرار',
-            'Decision time'
-          )}
-        </span>
-      </div>
-
-      <div class="kpi">
-        <b>
-          v2
-        </b>
-
-        <span>
-          ${t(
-            'إصدار التقرير',
-            'Report version'
-          )}
-        </span>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3 class="cardTitle">
-        ${t(
-          'بيانات القرار التاريخية',
-          'Historical decision snapshot'
-        )}
-      </h3>
-
-      <div class="decisionGrid">
-        <div>
-          <span>
-            ${t(
-              'الاسم',
-              'Name'
-            )}
-          </span>
-
-          <b>
-            ${decision.name}
-          </b>
-        </div>
-
-        <div>
-          <span>
-            ${t(
-              'المسمى الوظيفي',
-              'Job title'
-            )}
-          </span>
-
-          <b>
-            ${decision.title}
-          </b>
-        </div>
-
-        <div>
-          <span>
-            ${t(
-              'التاريخ والوقت',
-              'Date & time'
-            )}
-          </span>
-
-          <b>
-            ${decision.time}
-          </b>
-        </div>
-
-        <div>
-          <span>
-            ${t(
-              'سبب الرفض أو الإعادة',
-              'Reject / return reason'
-            )}
-          </span>
-
-          <b>
-            ${decision.reason}
-          </b>
-        </div>
-      </div>
-
-      <h3
-        class="cardTitle"
-        style="margin-top:15px"
-      >
-        ${t(
-          'محتوى التقرير',
-          'Report contents'
-        )}
-      </h3>
-
-      <p class="sub">
-        ${t(
-          'رقم التقرير والمشروع والموقع والزيارة والمفتش والحراس والبنود والإجابات والأوزان والنتيجة والملاحظات والمخالفات والأدلة والإجراءات التصحيحية',
-          'Report ID project site visit inspector guards items answers weights score notes findings evidence and corrective actions'
-        )}
-      </p>
-
-      ${listItem(
-        'qr-code',
-        t(
-          'QR للفيديو والأدلة',
-          'QR for video/evidence'
-        ),
-        t(
-          'الرابط يطلب تسجيل الدخول ويفحص الصلاحية',
-          'Link requires login and permission check'
-        )
-      )}
-
-      ${listItem(
-        'history',
-        t(
-          'إصدارات التقرير',
-          'Report versions'
-        ),
-        t(
-          'الإصدارات السابقة لا تستبدل',
-          'Previous versions are retained'
-        )
-      )}
-
-      ${
-        approved
-          ? `
-            <button
-              class="btn primary"
-              style="margin-top:12px"
-              onclick="downloadApprovedReport('${id}')"
-            >
-              ${I('download')}
-
-              ${t(
-                'تنزيل التقرير المعتمد PDF',
-                'Download approved PDF'
-              )}
-            </button>
-          `
-          : `
-            <div
-              class="policyHint"
-              style="margin-top:12px"
-            >
-              ${I('lock')}
-
-              ${t(
-                'لا يظهر تنزيل التقرير المعتمد لأن الحالة ليست معتمدة',
-                'Approved PDF download is hidden because status is not approved'
-              )}
-            </div>
-          `
-      }
-    </div>
-  `);
-}
-
-function downloadApprovedReport(
-  id
-) {
-  toast(
-    t(
-      `تم السماح بتنزيل ${id} حسب صلاحية الحساب`,
-      `Download allowed for ${id} under current permission`
-    )
-  );
-
-  setTimeout(
-    () => {
-      window.print();
+function searchData() {
+  const rows = [
+    {
+      ar: "محمد العتيبي",
+      en: "Mohammed Al Otaibi",
+      sub:
+        "EMP-1042 · P-001",
+      roles: [
+        "owner",
+        "quality_admin",
+        "quality_staff",
+        "project_manager",
+        "inspector",
+        "guard_supervisor"
+      ]
     },
-    400
-  );
-}
 
-function csv() {
-  const rows =
-    S.role === 'project_manager'
-      ? [
-          [
-            'REP-2026-000094',
-            'Al Waha',
-            92,
-            'Approved'
-          ]
-        ]
-      : [
-          [
-            'REP-2026-000094',
-            'Al Waha',
-            92,
-            'Approved'
-          ],
-
-          [
-            'REP-2026-000091',
-            'Palm Gate',
-            81,
-            'Pending'
-          ]
-        ];
-
-  const csvText = [
-    'report_id,project,score,status',
-    ...rows.map(
-      row => row.join(',')
-    )
-  ].join('\n');
-
-  const blob =
-    new Blob(
-      [csvText],
-      {
-        type:
-          'text/csv;charset=utf-8'
-      }
-    );
-
-  const url =
-    URL.createObjectURL(
-      blob
-    );
-
-  const anchor =
-    document.createElement(
-      'a'
-    );
-
-  anchor.href = url;
-
-  anchor.download =
-    'sqms-demo-report.csv';
-
-  anchor.click();
-
-  URL.revokeObjectURL(
-    url
-  );
-
-  toast(
-    t(
-      'تم إنشاء ملف CSV ضمن نطاق الصلاحية',
-      'CSV generated within current permission scope'
-    )
-  );
-}
-
-function userModal() {
-  modal(`
-    <h2>
-      ${t(
-        'إنشاء حساب جديد',
-        'Create New Account'
-      )}
-    </h2>
-
-    <p class="sub">
-      ${t(
-        'الحساب يظل غير مفعل حتى يوقع المستخدم التعهد ثم تراجعه إدارة الجودة',
-        'Account remains inactive until user signs undertaking and Quality Management reviews it'
-      )}
-    </p>
-
-    <div
-      class="formGrid"
-      style="margin-top:14px"
-    >
-      <div class="field">
-        <label>
-          ${t(
-            'الاسم',
-            'Name'
-          )}
-        </label>
-
-        <input
-          class="input"
-          value="${t(
-            'ناصر الشمري',
-            'Nasser Al Shammari'
-          )}"
-        >
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'البريد',
-            'Email'
-          )}
-        </label>
-
-        <input
-          class="input"
-          value="nasser@example.test"
-        >
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'الدور',
-            'Role'
-          )}
-        </label>
-
-        <select class="select">
-          <option>
-            ${t(
-              'مفتش الجودة',
-              'Quality Inspector'
-            )}
-          </option>
-
-          <option>
-            ${t(
-              'مدير مشروع',
-              'Project Manager'
-            )}
-          </option>
-
-          <option>
-            ${t(
-              'مشرف حراس',
-              'Guard Supervisor'
-            )}
-          </option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>
-          ${t(
-            'المشروع',
-            'Project'
-          )}
-        </label>
-
-        <select class="select">
-          <option>
-            ${projectName(
-              'P-001'
-            )}
-          </option>
-
-          <option>
-            ${projectName(
-              'P-002'
-            )}
-          </option>
-        </select>
-      </div>
-    </div>
-
-    <div
-      class="sensitive"
-      style="margin-top:12px"
-    >
-      ${I('file-signature')}
-
-      <div>
-        <b>
-          ${t(
-            'التعهد قبل التفعيل',
-            'Undertaking before activation'
-          )}
-        </b>
-
-        <p>
-          ${t(
-            'بعد الحفظ يرسل رابط التعهد والتوقيع ويظل الحساب Pending Undertaking',
-            'Saving sends undertaking and signature link and account remains Pending Undertaking'
-          )}
-        </p>
-      </div>
-    </div>
-
-    <button
-      class="btn primary"
-      style="margin-top:12px"
-      onclick="
-        toast(
-          t(
-            'تم إنشاء الحساب بحالة بانتظار التعهد وإرسال رابط التوقيع',
-            'Account created as Pending Undertaking and signature link sent'
-          )
-        );
-        closeModal()
-      "
-    >
-      ${t(
-        'إنشاء وإرسال التعهد',
-        'Create & send undertaking'
-      )}
-    </button>
-  `);
-}
-
-function accessDenied() {
-  modal(`
-    <div
-      style="
-        text-align:center;
-        padding:20px
-      "
-    >
-      ${I('shield-x')}
-
-      <h2>
-        403 · Access Denied
-      </h2>
-
-      <p class="sub">
-        ${t(
-          'الحساب الحالي لا يملك صلاحية الوصول إلى هذا المشروع حتى عند محاولة فتح رابط مباشر',
-          'Current account cannot access this project even through a direct URL attempt'
-        )}
-      </p>
-
-      <button
-        class="btn"
-        onclick="closeModal()"
-      >
-        ${t(
-          'إغلاق',
-          'Close'
-        )}
-      </button>
-    </div>
-  `);
-}
-
-function restoreTest() {
-  const box =
-    document.querySelector(
-      '#restoreResult'
-    );
-
-  if (!box) {
-    return;
-  }
-
-  box.innerHTML = `
-    <div
-      class="policyHint"
-      style="margin-top:12px"
-    >
-      ${I('loader-circle')}
-
-      ${t(
-        'جاري محاكاة استعادة قاعدة البيانات والمرفقات على بيئة منفصلة',
-        'Simulating database and attachment restore on an isolated environment'
-      )}
-    </div>
-  `;
-
-  icons();
-
-  setTimeout(
-    () => {
-      box.innerHTML = `
-        <div
-          class="policyHint"
-          style="margin-top:12px"
-        >
-          ${I(
-            'circle-check-big'
-          )}
-
-          ${t(
-            'نجحت تجربة الاستعادة التجريبية وتمت مطابقة السجلات والمرفقات والصلاحيات',
-            'Demo restore test passed and records attachments and permissions matched'
-          )}
-        </div>
-      `;
-
-      icons();
+    {
+      ar: "VIS-2026-000123",
+      en: "VIS-2026-000123",
+      sub:
+        "P-001 · 04 Oct",
+      roles: [
+        "owner",
+        "quality_admin",
+        "quality_staff",
+        "project_manager",
+        "inspector"
+      ]
     },
-    1400
-  );
-}
 
-function initSignature() {
-  const canvas =
-    document.querySelector(
-      '#sig'
-    );
+    {
+      ar: "REP-2026-000094",
+      en: "REP-2026-000094",
+      sub:
+        "P-001 · Approved",
+      roles: [
+        "owner",
+        "quality_admin",
+        "quality_staff",
+        "project_manager",
+        "inspector"
+      ]
+    },
 
-  if (!canvas) {
-    return;
-  }
-
-  const ctx =
-    canvas.getContext(
-      '2d'
-    );
-
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = '#e8c881';
-
-  let drawing = false;
-
-  function point(event) {
-    const rect =
-      canvas.getBoundingClientRect();
-
-    const source =
-      event.touches
-        ? event.touches[0]
-        : event;
-
-    return {
-      x:
-        (
-          source.clientX -
-          rect.left
-        ) *
-        (
-          canvas.width /
-          rect.width
-        ),
-
-      y:
-        (
-          source.clientY -
-          rect.top
-        ) *
-        (
-          canvas.height /
-          rect.height
-        )
-    };
-  }
-
-  function start(event) {
-    event.preventDefault();
-
-    drawing = true;
-    S.signatureDone = true;
-
-    const p =
-      point(event);
-
-    ctx.beginPath();
-
-    ctx.moveTo(
-      p.x,
-      p.y
-    );
-  }
-
-  function move(event) {
-    if (!drawing) {
-      return;
+    {
+      ar: "CAPA-2026-0041",
+      en: "CAPA-2026-0041",
+      sub:
+        "P-001 · Red escalation",
+      roles: [
+        "owner",
+        "quality_admin",
+        "quality_staff",
+        "project_manager"
+      ]
     }
+  ];
 
-    event.preventDefault();
-
-    const p =
-      point(event);
-
-    ctx.lineTo(
-      p.x,
-      p.y
-    );
-
-    ctx.stroke();
-  }
-
-  function end() {
-    drawing = false;
-  }
-
-  canvas.onmousedown =
-    start;
-
-  canvas.onmousemove =
-    move;
-
-  canvas.onmouseup =
-    end;
-
-  canvas.onmouseleave =
-    end;
-
-  canvas.ontouchstart =
-    start;
-
-  canvas.ontouchmove =
-    move;
-
-  canvas.ontouchend =
-    end;
-}
-
-function clearSig() {
-  const canvas =
-    document.querySelector(
-      '#sig'
-    );
-
-  if (!canvas) {
-    return;
-  }
-
-  canvas
-    .getContext('2d')
-    .clearRect(
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-  S.signatureDone = false;
-}
-
-function submitRegistration() {
-  if (!S.signatureDone) {
-    toast(
-      t(
-        'التوقيع الإلكتروني إلزامي قبل إرسال الطلب',
-        'Electronic signature is mandatory before submission'
+  return rows.filter(
+    item =>
+      item.roles.includes(
+        state.role
       )
-    );
-
-    return;
-  }
-
-  toast(
-    t(
-      'تم حفظ التعهد والتوقيع وإشعار إدارة الجودة بالطلب',
-      'Undertaking and signature saved and Quality Management notified'
-    )
   );
 }
 
 function openSearch() {
-  const layer =
-    document.querySelector(
-      '#searchLayer'
-    );
-
-  if (!layer) {
-    return;
-  }
-
-  layer.classList.remove(
-    'hidden'
+  document.querySelector(
+    "#searchLayer"
+  ).classList.remove(
+    "hidden"
   );
+
+  document.querySelector(
+    "#searchField"
+  ).value = "";
+
+  renderSearch();
 
   setTimeout(
     () => {
-      document
-        .querySelector(
-          '#globalSearch'
-        )
-        ?.focus();
+      document.querySelector(
+        "#searchField"
+      ).focus();
     },
-    60
+    50
   );
-
-  search();
 }
 
 function closeSearch() {
-  const layer =
-    document.querySelector(
-      '#searchLayer'
-    );
-
-  if (layer) {
-    layer.classList.add(
-      'hidden'
-    );
-  }
+  document.querySelector(
+    "#searchLayer"
+  ).classList.add(
+    "hidden"
+  );
 }
 
-function search() {
-  const data = [
-    [
-      'guard',
-      'محمد العتيبي',
-      'Mohammed Al Otaibi',
-      'EMP-1042 · ID 1098765432 · P-001',
-      'owner,quality_admin,quality_staff,project_manager,inspector,guard_supervisor'
-    ],
-
-    [
-      'inspector',
-      'خالد السالم',
-      'Khaled Al Salem',
-      'EMP-2201 · ID 1077001122 · 12 visits',
-      'owner,quality_admin,quality_staff,project_manager'
-    ],
-
-    [
-      'visit',
-      'VIS-2026-000123',
-      'VIS-2026-000123',
-      'CASE VIS-2026-000123 · P-001 · 04 Oct 2026',
-      'owner,quality_admin,quality_staff,project_manager,inspector'
-    ],
-
-    [
-      'report',
-      'REP-2026-000094',
-      'REP-2026-000094',
-      'CASE REP-2026-000094 · Approved · 92%',
-      'owner,quality_admin,quality_staff,project_manager,inspector'
-    ],
-
-    [
-      'action',
-      'CAPA-2026-0041',
-      'CAPA-2026-0041',
-      'CASE CAPA-2026-0041 · Emergency gate · overdue',
-      'owner,quality_admin,quality_staff,project_manager'
-    ],
-
-    [
-      'training',
-      'TRN-2026-0018',
-      'TRN-2026-0018',
-      'CASE TRN-2026-0018 · Crowd Management · pending',
-      'owner,quality_admin,project_manager,guard_supervisor'
-    ]
-  ];
-
-  const value =
+function renderSearch() {
+  const q =
     (
       document.querySelector(
-        '#globalSearch'
-      )?.value ||
-      ''
+        "#searchField"
+      )?.value || ""
     )
       .trim()
       .toLowerCase();
 
   let rows =
-    data.filter(item => {
-      return item[4]
-        .split(',')
-        .includes(S.role);
-    });
+    searchData();
 
-  if (
-    S.role === 'project_manager'
-  ) {
+  if (q) {
     rows =
-      rows.filter(item => {
-        return !item[3].includes(
-          'P-002'
-        );
-      });
+      rows.filter(
+        item =>
+          (
+            item.ar +
+            item.en +
+            item.sub
+          )
+            .toLowerCase()
+            .includes(q)
+      );
   }
 
-  if (value) {
-    rows =
-      rows.filter(item => {
-        return (
-          item[1] +
-          item[2] +
-          item[3]
-        )
-          .toLowerCase()
-          .includes(value);
-      });
-  }
+  document.querySelector(
+    "#searchResults"
+  ).innerHTML =
+    rows.length
+      ? rows
+          .map(item => {
+            return `
+              <div class="searchItem">
 
-  const box =
-    document.querySelector(
-      '#searchResults'
-    );
+                <div>
+                  <b>
+                    ${
+                      state.lang ===
+                      "ar"
+                        ? item.ar
+                        : item.en
+                    }
+                  </b>
 
-  if (!box) {
-    return;
-  }
+                  <span>
+                    ${item.sub}
+                  </span>
+                </div>
 
-  if (!rows.length) {
-    box.innerHTML = `
-      <div
-        style="
-          padding:30px;
-          text-align:center;
-          color:var(--muted)
-        "
-      >
-        ${I('search-x')}
+                ${icon("arrow-up-left")}
 
-        <br>
+              </div>
+            `;
+          })
+          .join("")
+      : `
+        <div
+          style="
+            padding:35px;
+            text-align:center;
+            color:var(--muted);
+            font-size:9px
+          "
+        >
+          ${icon("search-x")}
 
-        ${t(
-          'لا توجد نتائج ضمن صلاحيات الحساب',
-          'No results within this account scope'
-        )}
-      </div>
-    `;
-
-    icons();
-
-    return;
-  }
-
-  box.innerHTML =
-    rows
-      .map(item => {
-        return `
-          <div class="searchResult">
-            <div>
-              <b>
-                ${
-                  S.lang === 'ar'
-                    ? item[1]
-                    : item[2]
-                }
-              </b>
-
-              <span>
-                ${item[3]}
-              </span>
-            </div>
-
-            ${I(
-              'arrow-up-left'
+          <p>
+            ${t(
+              "لا توجد نتائج ضمن صلاحيات هذا الحساب",
+              "No results within this account scope"
             )}
-          </div>
-        `;
-      })
-      .join('');
+          </p>
+        </div>
+      `;
 
-  icons();
+  refreshIcons();
 }
 
-function toggleLang() {
-  S.lang =
-    S.lang === 'ar'
-      ? 'en'
-      : 'ar';
-
-  document.documentElement.lang =
-    S.lang;
-
-  document.documentElement.dir =
-    S.lang === 'ar'
-      ? 'rtl'
-      : 'ltr';
-
-  updateRole();
-
-  toast(
-    S.lang === 'ar'
-      ? 'تم التحويل إلى العربية'
-      : 'Switched to English'
-  );
-}
-
-function notificationsModal() {
+function notificationModal() {
   modal(`
     <h2>
       ${t(
-        'الإشعارات',
-        'Notifications'
+        "الإشعارات",
+        "Notifications"
       )}
     </h2>
 
-    <div
-      class="list"
-      style="margin-top:12px"
-    >
-      ${listItem(
-        'clipboard-check',
-        t(
-          'تقرير بانتظار المراجعة',
-          'Report pending review'
-        ),
-        t(
-          'VIS-2026-000123 · قبل 8 دقائق',
-          'VIS-2026-000123 · 8 minutes ago'
-        )
-      )}
+    <div class="list">
 
       ${listItem(
-        'siren',
+        "siren",
         t(
-          'حالة حرجة',
-          'Critical finding'
+          "ملاحظة حرجة جديدة",
+          "New Critical Finding"
         ),
         t(
-          'تم إشعار إدارة المشروع فورًا',
-          'Project Management was notified immediately'
+          "تم إرسال إشعار فوري لإدارة المشروع",
+          "Immediate Project Management notification sent"
         ),
-        B(
+        badge(
           t(
-            'فوري',
-            'Immediate'
+            "فوري",
+            "Immediate"
           ),
-          'danger'
+          "danger"
         )
       )}
 
       ${listItem(
-        'clock-alert',
+        "clock-alert",
         t(
-          'تصعيد أصفر بعد 3 أيام',
-          'Yellow escalation after 3 days'
+          "تصعيد بعد 3 أيام",
+          "3-Day Escalation"
         ),
         t(
-          'تمت محاكاة إرسال بريد للجهة المسؤولة',
-          'Email to responsible party simulated'
+          "تم إرسال بريد المرحلة الصفراء",
+          "Yellow-stage email sent"
         ),
-        B(
+        badge(
           t(
-            'أصفر',
-            'Yellow'
+            "أصفر",
+            "Yellow"
           ),
-          'warning'
+          "warning"
         )
       )}
 
       ${listItem(
-        'lock-keyhole',
+        "file-check-2",
         t(
-          'تحديث في قناة خاصة',
-          'Private channel update'
+          "تقرير للمراجعة",
+          "Report to Review"
+        ),
+        "REP-2026-000094"
+      )}
+
+      ${listItem(
+        "lock-keyhole",
+        t(
+          "تحديث في قناة خاصة",
+          "Private Channel Update"
         ),
         t(
-          'لا يظهر محتوى البلاغ في الإشعار',
-          'Sensitive content is not exposed in notification'
+          "المحتوى غير ظاهر في الإشعار",
+          "Sensitive content is hidden from notification"
         )
       )}
+
     </div>
   `);
 }
 
-document.addEventListener(
-  'DOMContentLoaded',
-  () => {
-    setupRoles();
+function toggleLanguage() {
+  state.lang =
+    state.lang === "ar"
+      ? "en"
+      : "ar";
 
-    updateRole();
+  document.documentElement.lang =
+    state.lang;
 
-    const menu =
-      document.querySelector(
-        '#menu'
-      );
+  document.documentElement.dir =
+    state.lang === "ar"
+      ? "rtl"
+      : "ltr";
 
-    if (menu) {
-      menu.onclick = () => {
-        document
-          .querySelector(
-            '#sidebar'
-          )
-          ?.classList.toggle(
-            'open'
+  updateAccount();
+  setupAccountMenu();
+  render();
+
+  toast(
+    state.lang === "ar"
+      ? "تم التحويل إلى العربية"
+      : "Switched to English"
+  );
+}
+
+function updateLoginRole() {
+  const role =
+    document.querySelector(
+      "#loginRole"
+    ).value;
+
+  document.querySelector(
+    "#demoEmail"
+  ).value =
+    roles[role].email;
+}
+
+function enterDemo() {
+  state.role =
+    document.querySelector(
+      "#loginRole"
+    ).value;
+
+  state.page = "home";
+
+  const login =
+    document.querySelector(
+      "#loginScreen"
+    );
+
+  const app =
+    document.querySelector(
+      "#app"
+    );
+
+  if (
+    window.gsap
+  ) {
+    gsap.to(
+      login,
+      {
+        opacity: 0,
+        scale: .985,
+        duration: .45,
+        ease: "power2.inOut",
+        onComplete() {
+          login.classList.add(
+            "hidden"
           );
-      };
-    }
 
-    const roleButton =
-      document.querySelector(
-        '#roleBtn'
-      );
+          app.classList.remove(
+            "hidden"
+          );
 
-    if (roleButton) {
-      roleButton.onclick =
-        event => {
-          event.stopPropagation();
+          gsap.from(
+            app,
+            {
+              opacity: 0,
+              duration: .5
+            }
+          );
 
-          document
-            .querySelector(
-              '#roleMenu'
-            )
-            ?.classList.toggle(
-              'open'
-            );
-        };
-    }
+          updateAccount();
+          setupAccountMenu();
+          render();
+        }
+      }
+    );
+  } else {
+    login.classList.add(
+      "hidden"
+    );
 
-    const language =
-      document.querySelector(
-        '#lang'
-      );
+    app.classList.remove(
+      "hidden"
+    );
 
-    if (language) {
-      language.onclick =
-        toggleLang;
-    }
+    updateAccount();
+    setupAccountMenu();
+    render();
+  }
+}
 
-    const bell =
-      document.querySelector(
-        '#bell'
-      );
+function splashSequence() {
+  const splash =
+    document.querySelector(
+      "#splash"
+    );
 
-    if (bell) {
-      bell.onclick =
-        notificationsModal;
-    }
+  const login =
+    document.querySelector(
+      "#loginScreen"
+    );
 
-    const searchButton =
-      document.querySelector(
-        '#searchBtn'
-      );
+  if (
+    !window.gsap
+  ) {
+    setTimeout(
+      () => {
+        splash.classList.add(
+          "hidden"
+        );
 
-    if (searchButton) {
-      searchButton.onclick =
-        openSearch;
-    }
+        login.classList.remove(
+          "hidden"
+        );
+      },
+      1400
+    );
 
-    const searchClose =
-      document.querySelector(
-        '#searchClose'
-      );
+    return;
+  }
 
-    if (searchClose) {
-      searchClose.onclick =
-        closeSearch;
-    }
+  const tl =
+    gsap.timeline();
 
-    const globalSearch =
-      document.querySelector(
-        '#globalSearch'
-      );
+  tl
+    .from(
+      ".markCore",
+      {
+        opacity: 0,
+        scale: .4,
+        rotate: -20,
+        duration: .7,
+        ease: "back.out(1.7)"
+      }
+    )
 
-    if (globalSearch) {
-      globalSearch.oninput =
-        search;
-    }
+    .from(
+      ".orbitA",
+      {
+        opacity: 0,
+        scale: .5,
+        duration: .6
+      },
+      "-=.3"
+    )
 
-    const modalClose =
-      document.querySelector(
-        '#modalClose'
-      );
+    .from(
+      ".orbitB",
+      {
+        opacity: 0,
+        scale: .5,
+        duration: .6
+      },
+      "-=.45"
+    )
 
-    if (modalClose) {
-      modalClose.onclick =
-        closeModal;
-    }
+    .from(
+      ".splashCopy > *",
+      {
+        opacity: 0,
+        y: 15,
+        stagger: .08,
+        duration: .45
+      },
+      "-=.25"
+    )
 
-    const modalLayer =
-      document.querySelector(
-        '#modal'
-      );
+    .to(
+      ".loadingLine span",
+      {
+        width: "100%",
+        duration: 1.2,
+        ease: "power2.inOut"
+      }
+    )
 
-    if (modalLayer) {
-      modalLayer.onclick =
-        event => {
-          if (
-            event.target.id ===
-            'modal'
-          ) {
-            closeModal();
-          }
-        };
-    }
+    .to(
+      ".splashContent",
+      {
+        opacity: 0,
+        y: -10,
+        duration: .35
+      }
+    )
 
-    const searchLayer =
-      document.querySelector(
-        '#searchLayer'
-      );
+    .to(
+      splash,
+      {
+        opacity: 0,
+        duration: .45,
+        onComplete() {
+          splash.classList.add(
+            "hidden"
+          );
 
-    if (searchLayer) {
-      searchLayer.onclick =
-        event => {
-          if (
-            event.target.id ===
-            'searchLayer'
-          ) {
-            closeSearch();
-          }
-        };
-    }
+          login.classList.remove(
+            "hidden"
+          );
 
-    document.addEventListener(
-      'click',
+          gsap.from(
+            ".loginVisualInner",
+            {
+              opacity: 0,
+              x: 30,
+              duration: .65
+            }
+          );
+
+          gsap.from(
+            ".loginCard",
+            {
+              opacity: 0,
+              y: 30,
+              duration: .65
+            }
+          );
+        }
+      }
+    );
+}
+
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+
+    refreshIcons();
+
+    splashSequence();
+
+    document.querySelector(
+      "#loginRole"
+    ).addEventListener(
+      "change",
+      updateLoginRole
+    );
+
+    document.querySelector(
+      "#loginBtn"
+    ).addEventListener(
+      "click",
+      enterDemo
+    );
+
+    document.querySelector(
+      "#accountButton"
+    ).addEventListener(
+      "click",
+      event => {
+        event.stopPropagation();
+
+        document.querySelector(
+          "#accountMenu"
+        ).classList.toggle(
+          "open"
+        );
+      }
+    );
+
+    document.querySelector(
+      "#mobileMenu"
+    ).addEventListener(
+      "click",
+      () => {
+        document.querySelector(
+          "#mobileNav"
+        ).classList.toggle(
+          "open"
+        );
+      }
+    );
+
+    document.querySelector(
+      "#globalSearchButton"
+    ).addEventListener(
+      "click",
+      openSearch
+    );
+
+    document.querySelector(
+      "#searchClose"
+    ).addEventListener(
+      "click",
+      closeSearch
+    );
+
+    document.querySelector(
+      "#searchField"
+    ).addEventListener(
+      "input",
+      renderSearch
+    );
+
+    document.querySelector(
+      "#languageButton"
+    ).addEventListener(
+      "click",
+      toggleLanguage
+    );
+
+    document.querySelector(
+      "#notificationButton"
+    ).addEventListener(
+      "click",
+      notificationModal
+    );
+
+    document.querySelector(
+      "#modalClose"
+    ).addEventListener(
+      "click",
+      closeModal
+    );
+
+    document.querySelector(
+      "#modalLayer"
+    ).addEventListener(
+      "click",
       event => {
         if (
-          !event.target.closest(
-            '.roleWrap'
-          )
+          event.target.id ===
+          "modalLayer"
         ) {
-          document
-            .querySelector(
-              '#roleMenu'
-            )
-            ?.classList.remove(
-              'open'
-            );
+          closeModal();
+        }
+      }
+    );
+
+    document.querySelector(
+      "#searchLayer"
+    ).addEventListener(
+      "click",
+      event => {
+        if (
+          event.target.id ===
+          "searchLayer"
+        ) {
+          closeSearch();
         }
       }
     );
 
     document.addEventListener(
-      'keydown',
+      "click",
       event => {
+        if (
+          !event.target.closest(
+            ".accountWrap"
+          )
+        ) {
+          document.querySelector(
+            "#accountMenu"
+          ).classList.remove(
+            "open"
+          );
+        }
+      }
+    );
+
+    document.addEventListener(
+      "keydown",
+      event => {
+
+        if (
+          event.key === "Escape"
+        ) {
+          closeModal();
+          closeSearch();
+        }
+
         if (
           (
             event.ctrlKey ||
             event.metaKey
           ) &&
           event.key.toLowerCase() ===
-            'k'
+            "k"
         ) {
           event.preventDefault();
-
           openSearch();
         }
 
-        if (
-          event.key ===
-          'Escape'
-        ) {
-          closeModal();
-          closeSearch();
-        }
       }
     );
 
-    icons();
   }
 );

@@ -1,57 +1,510 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#07111d">
-<title>SQMS Demo</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Manrope:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
-<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <meta charset="utf-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  >
+
+  <meta
+    name="theme-color"
+    content="#07131f"
+  >
+
+  <title>SQMS Experience Demo</title>
+
+  <link
+    rel="preconnect"
+    href="https://fonts.googleapis.com"
+  >
+
+  <link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+  >
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap"
+    rel="stylesheet"
+  >
+
+  <link
+    rel="stylesheet"
+    href="styles.css"
+  >
+
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
 </head>
+
 <body>
-<div class="noise"></div>
-<div class="glow g1"></div>
-<div class="glow g2"></div>
 
-<div class="shell">
-<aside id="sidebar" class="sidebar">
-<div class="brand">
-<div class="brandIcon"><i data-lucide="shield-check"></i></div>
-<div><b>SQMS</b><span id="brandSub">إدارة الجودة الأمنية</span></div>
-</div>
-<div class="demo"><i data-lucide="flask-conical"></i><span id="demoLabel">نسخة تجريبية ببيانات وهمية</span></div>
-<nav id="nav" class="nav"></nav>
-<div class="sideFoot"><i data-lucide="lock"></i><div><b id="sideFootTitle">نطاقات وصول حقيقية في النظام النهائي</b><span id="sideFootSub">الديمو يحاكي الواجهة وتدفق الصلاحيات</span></div></div>
-</aside>
+  <div class="ambient ambientA"></div>
+  <div class="ambient ambientB"></div>
+  <div class="grain"></div>
 
-<main>
-<header>
-<div class="headStart">
-<button id="menu" class="icon mobile" aria-label="القائمة"><i data-lucide="menu"></i></button>
-<div><span class="eyebrow">SECURITY QUALITY WORKSPACE</span><h1 id="title">لوحة التحكم</h1></div>
-</div>
-<div class="headActions">
-<button id="searchBtn" class="search"><i data-lucide="search"></i><span id="searchLabel">بحث سريع</span><kbd>⌘ K</kbd></button>
-<button class="icon" onclick="go('demo_guide')" title="دليل الديمو"><i data-lucide="map"></i></button>
-<button id="lang" class="icon" title="تغيير اللغة"><i data-lucide="languages"></i></button>
-<button id="bell" class="icon dot" title="الإشعارات"><i data-lucide="bell"></i></button>
-<div class="roleWrap">
-<button id="roleBtn" class="roleBtn"><span class="avatar">س</span><span class="roleTxt"><b id="roleName">سلطان — مالك النظام</b><small id="roleScope">كل المشاريع</small></span><i data-lucide="chevron-down"></i></button>
-<div id="roleMenu" class="roleMenu"></div>
-</div>
-</div>
-</header>
-<section id="content" class="content"></section>
-</main>
-</div>
+  <section
+    id="splash"
+    class="splash"
+  >
+    <div class="splashGrid"></div>
 
-<div id="toast" class="toast"></div>
-<div id="modal" class="overlay hidden"><div class="modal"><button id="modalClose" class="close" aria-label="إغلاق"><i data-lucide="x"></i></button><div id="modalBody"></div></div></div>
-<div id="searchLayer" class="searchLayer hidden"><div class="searchPanel"><div class="searchHead"><i data-lucide="search"></i><input id="globalSearch" placeholder="ابحث بالاسم أو الهوية أو الرقم الوظيفي أو رقم الحالة"><button id="searchClose" class="icon"><i data-lucide="x"></i></button></div><p id="searchHint">النتائج تخضع لصلاحيات الحساب الحالي والبلاغات الحساسة لا تظهر في البحث العام</p><div id="searchResults"></div></div></div>
+    <div class="splashContent">
 
-<script src="app.js"></script>
+      <div class="splashMark">
+        <div class="markCore">
+          <i data-lucide="shield-check"></i>
+        </div>
+
+        <div class="orbit orbitA"></div>
+        <div class="orbit orbitB"></div>
+      </div>
+
+      <div class="splashCopy">
+
+        <span class="overline">
+          SECURITY QUALITY MANAGEMENT
+        </span>
+
+        <h1>
+          نظام الجودة الأمنية
+        </h1>
+
+        <p>
+          تجربة تشغيلية مبسطة تربط المشروع بالزيارة
+          والتقرير والملاحظة والإجراء التصحيحي
+          في مسار واضح واحد
+        </p>
+
+      </div>
+
+      <div class="loadingLine">
+        <span></span>
+      </div>
+
+    </div>
+  </section>
+
+  <section
+    id="loginScreen"
+    class="loginScreen hidden"
+  >
+
+    <div class="loginVisual">
+
+      <div class="loginVisualInner">
+
+        <div class="loginBrand">
+          <div class="logoBox">
+            <i data-lucide="shield-check"></i>
+          </div>
+
+          <div>
+            <b>SQMS</b>
+            <span>Security Quality Management System</span>
+          </div>
+        </div>
+
+        <div class="loginHero">
+
+          <span class="overline">
+            ROLE BASED EXPERIENCE
+          </span>
+
+          <h2>
+            كل مستخدم يرى فقط ما يحتاجه لإنجاز عمله
+          </h2>
+
+          <p>
+            تم إعادة تصور النظام ليبدأ المستخدم من مهمته مباشرة
+            بدل التنقل بين شاشات كثيرة متشابهة
+          </p>
+
+        </div>
+
+        <div class="journeyPreview">
+
+          <div class="journeyStep active">
+            <span>01</span>
+            <div>
+              <b>المشروع</b>
+              <small>Project</small>
+            </div>
+          </div>
+
+          <div class="journeyConnector"></div>
+
+          <div class="journeyStep">
+            <span>02</span>
+            <div>
+              <b>الزيارة</b>
+              <small>Visit</small>
+            </div>
+          </div>
+
+          <div class="journeyConnector"></div>
+
+          <div class="journeyStep">
+            <span>03</span>
+            <div>
+              <b>التقرير</b>
+              <small>Report</small>
+            </div>
+          </div>
+
+          <div class="journeyConnector"></div>
+
+          <div class="journeyStep">
+            <span>04</span>
+            <div>
+              <b>الإجراء</b>
+              <small>Action</small>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="loginPanel">
+
+      <div class="loginCard">
+
+        <div class="loginCardHead">
+
+          <span class="demoBadge">
+            <i data-lucide="flask-conical"></i>
+            نسخة تجريبية
+          </span>
+
+          <h2>
+            تجربة النظام حسب الدور
+          </h2>
+
+          <p>
+            اختار الحساب المطلوب وسيتم فتح تجربة مختلفة
+            تناسب مهام وصلاحيات هذا المستخدم
+          </p>
+
+        </div>
+
+        <div class="field">
+
+          <label>
+            الحساب التجريبي
+          </label>
+
+          <div class="selectWrap">
+
+            <i data-lucide="user-round"></i>
+
+            <select
+              id="loginRole"
+              class="input select"
+            >
+
+              <option value="owner">
+                مالك النظام
+              </option>
+
+              <option value="quality_admin">
+                إدارة قسم الجودة
+              </option>
+
+              <option value="quality_staff">
+                موظف قسم الجودة
+              </option>
+
+              <option value="project_manager">
+                مدير المشروع
+              </option>
+
+              <option value="inspector">
+                مفتش الجودة
+              </option>
+
+              <option value="guard_supervisor">
+                مشرف حراس الأمن
+              </option>
+
+              <option value="guard">
+                حارس الأمن
+              </option>
+
+            </select>
+
+          </div>
+
+        </div>
+
+        <div class="field">
+
+          <label>
+            البريد
+          </label>
+
+          <div class="inputIcon">
+
+            <i data-lucide="mail"></i>
+
+            <input
+              id="demoEmail"
+              class="input"
+              value="owner@demo.local"
+              readonly
+            >
+
+          </div>
+
+        </div>
+
+        <div class="field">
+
+          <label>
+            كلمة المرور
+          </label>
+
+          <div class="inputIcon">
+
+            <i data-lucide="key-round"></i>
+
+            <input
+              class="input"
+              value="Demo123!"
+              type="password"
+              readonly
+            >
+
+          </div>
+
+        </div>
+
+        <button
+          id="loginBtn"
+          class="mainButton"
+        >
+          <span>
+            دخول للتجربة
+          </span>
+
+          <i data-lucide="arrow-left"></i>
+        </button>
+
+        <div class="loginNote">
+
+          <i data-lucide="info"></i>
+
+          <span>
+            تبديل الحسابات في الديمو مخصص فقط لعرض الصلاحيات
+            ولن يكون بهذه الطريقة في النسخة النهائية
+          </span>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+  <div
+    id="app"
+    class="app hidden"
+  >
+
+    <header class="topbar">
+
+      <div class="topbarInner">
+
+        <div class="topBrand">
+
+          <button
+            id="mobileMenu"
+            class="iconButton mobileOnly"
+          >
+            <i data-lucide="menu"></i>
+          </button>
+
+          <div class="miniLogo">
+            <i data-lucide="shield-check"></i>
+          </div>
+
+          <div>
+            <b>SQMS</b>
+            <span id="workspaceName">
+              Quality Workspace
+            </span>
+          </div>
+
+        </div>
+
+        <nav
+          id="mainNav"
+          class="mainNav"
+        ></nav>
+
+        <div class="topActions">
+
+          <button
+            id="globalSearchButton"
+            class="iconButton"
+            title="بحث"
+          >
+            <i data-lucide="search"></i>
+          </button>
+
+          <button
+            id="languageButton"
+            class="iconButton"
+            title="اللغة"
+          >
+            <i data-lucide="languages"></i>
+          </button>
+
+          <button
+            id="notificationButton"
+            class="iconButton notificationButton"
+          >
+            <i data-lucide="bell"></i>
+            <span class="notificationDot"></span>
+          </button>
+
+          <div class="accountWrap">
+
+            <button
+              id="accountButton"
+              class="accountButton"
+            >
+
+              <div
+                id="accountAvatar"
+                class="accountAvatar"
+              >
+                س
+              </div>
+
+              <div class="accountText">
+                <b id="accountName">
+                  سلطان
+                </b>
+
+                <span id="accountRole">
+                  مالك النظام
+                </span>
+              </div>
+
+              <i data-lucide="chevron-down"></i>
+
+            </button>
+
+            <div
+              id="accountMenu"
+              class="accountMenu"
+            ></div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </header>
+
+    <div
+      id="mobileNav"
+      class="mobileNav"
+    ></div>
+
+    <main>
+
+      <section
+        id="page"
+        class="page"
+      ></section>
+
+    </main>
+
+  </div>
+
+  <div
+    id="modalLayer"
+    class="modalLayer hidden"
+  >
+
+    <div class="modal">
+
+      <button
+        id="modalClose"
+        class="modalClose"
+      >
+        <i data-lucide="x"></i>
+      </button>
+
+      <div id="modalBody"></div>
+
+    </div>
+
+  </div>
+
+  <div
+    id="searchLayer"
+    class="searchLayer hidden"
+  >
+
+    <div class="searchBox">
+
+      <div class="searchInput">
+
+        <i data-lucide="search"></i>
+
+        <input
+          id="searchField"
+          placeholder="ابحث بالاسم أو رقم الزيارة أو التقرير أو الموظف"
+        >
+
+        <button
+          id="searchClose"
+          class="iconButton"
+        >
+          <i data-lucide="x"></i>
+        </button>
+
+      </div>
+
+      <div class="searchPrivacy">
+
+        <i data-lucide="shield-check"></i>
+
+        <span>
+          نتائج البحث تخضع لنطاق الحساب الحالي
+          والبلاغات الحساسة لا تظهر هنا
+        </span>
+
+      </div>
+
+      <div
+        id="searchResults"
+        class="searchResults"
+      ></div>
+
+    </div>
+
+  </div>
+
+  <div
+    id="toast"
+    class="toast"
+  ></div>
+
+  <script src="app.js"></script>
+
 </body>
+
 </html>
